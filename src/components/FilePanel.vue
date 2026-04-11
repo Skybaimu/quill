@@ -218,12 +218,13 @@ function getFileItemCount(file) {
 function handleAddFile() {
   const file = storeAddFile()
   if (file) {
-    editingFileId.value = file.id
     nextTick(() => {
       selectFile(file.id)
       nextTick(() => {
-        const input = document.querySelector('.file-name-input')
-        if (input) { input.focus(); input.select() }
+        const display = document.querySelector('.block-text-display')
+        if (display) {
+          display.click()
+        }
       })
     })
   }
@@ -418,10 +419,9 @@ defineExpose({ editingFileId })
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
-  opacity: 0;
+  opacity: 0.5;
 }
-.file-item:hover .file-more { opacity: 1; }
-.file-more:hover { background: var(--surface-hover); color: var(--text-primary); }
+.file-more:hover { background: var(--surface-hover); color: var(--text-primary); opacity: 1; }
 
 .file-preview {
   font-size: 12px; color: var(--text-muted); white-space: nowrap;

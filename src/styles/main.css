@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap');
 
 :root {
+  /* Font size (adjustable) */
+  --app-font-size: 14px;
+
   /* Background */
   --bg: #faf9f7;
   --surface: #ffffff;
@@ -48,7 +51,7 @@ body {
   color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--app-font-size);
   line-height: 1.6;
 }
 

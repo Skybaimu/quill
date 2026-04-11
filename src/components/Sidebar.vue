@@ -4,11 +4,23 @@
       <div class="logo" v-show="!store.sidebarCollapsed">
         <span class="logo-q">q</span>uill
       </div>
-      <button class="icon-btn import-export-btn" @click="showImportExport = !showImportExport" title="导入/导出" v-show="!store.sidebarCollapsed">
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      <button class="icon-btn import-export-btn" @click="showMenu = !showMenu" title="菜单" v-show="!store.sidebarCollapsed">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
+      <!-- 汉堡菜单下拉 -->
+      <div class="hamburger-dropdown" v-if="showMenu" @click.stop>
+        <label class="menu-item" @click="showMenu = false">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          导入数据
+          <input type="file" accept=".json" @change="doImport" hidden />
+        </label>
+        <div class="menu-item" @click="doExportAll">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          导出全部数据
+        </div>
+      </div>
       <button class="toggle-btn" @click="store.sidebarCollapsed = !store.sidebarCollapsed" :title="store.sidebarCollapsed ? '展开' : '收起'">
         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path v-if="!store.sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
@@ -18,7 +30,7 @@
     </div>
 
     <!-- Expanded content -->
-    <div class="sidebar-body" v-show="!store.sidebarCollapsed">
+    <div class="sidebar-body" v-show="!store.sidebarCollapsed" @click="showMenu = false">
       <!-- Workspace section -->
       <div class="sidebar-section">
         <div class="sidebar-label">
@@ -96,19 +108,7 @@
           </div>
         </div>
       </div>
-      <div class="import-export-panel" v-if="showImportExport">
-        <div class="ie-title">导入 / 导出</div>
-        <button class="ie-btn" @click="doExportAll">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          导出全部数据
-        </button>
-        <label class="ie-btn ie-import">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          导入数据
-          <input type="file" accept=".json" @change="doImport" hidden />
-        </label>
-        <div class="ie-hint">导出为 JSON 文件，可备份或迁移数据</div>
-      </div>
+
     </div>
 
     <!-- Collapsed icon-only mode -->
@@ -146,7 +146,7 @@ const editingCatId = ref(null)
 const catNameInputRef = ref(null)
 const dragCatId = ref(null)
 const dragOverId = ref(null)
-const showImportExport = ref(false)
+const showMenu = ref(false)
 
 const DEFAULT_CAT_IDS = new Set(['c1', 'c2', 'c3', 'c4'])
 
@@ -210,7 +210,7 @@ function doExportAll() {
   const json = exportAllAsJson()
   downloadFile(json, 'quill-backup-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
   showToast('已导出全部数据')
-  showImportExport.value = false
+  showMenu.value = false
 }
 
 async function doImport(e) {
@@ -225,7 +225,7 @@ async function doImport(e) {
     showToast('读取文件失败')
   }
   e.target.value = ''
-  showImportExport.value = false
+  showMenu.value = false
 }
 
 // Drag & drop for categories
@@ -404,4 +404,19 @@ function onDragEnd() {
 .ie-btn:hover { background: var(--surface); color: var(--text-primary); }
 .ie-import { cursor: pointer; }
 .ie-hint { font-size: 10px; color: var(--text-muted); margin-top: 6px; padding: 0 4px; }
+
+/* Hamburger dropdown */
+.hamburger-dropdown {
+  position: absolute; left: 16px; top: 52px; z-index: 500;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
+  padding: 6px; min-width: 170px;
+}
+.menu-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 6px; cursor: pointer; font-size: 13px;
+  color: var(--text-secondary); transition: all 0.1s;
+}
+.menu-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.menu-item svg { opacity: 0.6; flex-shrink: 0; }
 </style>

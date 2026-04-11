@@ -386,7 +386,7 @@ function openBlockMenu(e, block) {
 }
 
 function unlockApi(item) {
-  store.lockFileId = store.currentFile
+  store.lockFileId = '__global__'
   store.lockMode = 'unlock'
   store.lockCallback = () => { item._locked = false }
   store.lockVisible = true
@@ -515,13 +515,16 @@ defineExpose({ renamingBlockId, editingBlockId })
 
 /* Content body */
 .content-body {
-  flex: 1; overflow-y: auto; padding: 32px 40px 80px;
+  flex: 1; overflow-y: auto; padding: 32px 40px 120px;
 }
-.content-layout { max-width: 800px; }
+.content-layout { max-width: 1000px; }
 .content-file-title {
   font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 300;
-  color: var(--text-primary); margin-bottom: 8px; padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-light);
+  color: var(--accent); padding-bottom: 12px;
+  padding-left: 14px; border-left: 3px solid var(--accent);
+  position: sticky; top: 0; z-index: 11;
+  background: var(--surface);
+  padding-top: 10px; margin-bottom: 16px;
 }
 
 /* Blocks */
@@ -530,9 +533,9 @@ defineExpose({ renamingBlockId, editingBlockId })
   animation: fadeIn 0.2s ease;
 }
 .block-header {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; gap: 8px; padding: 10px 0;
-  border-bottom: 2px solid var(--border-light); margin-bottom: 8px;
+  position: sticky; top: 72px; z-index: 10;
+  display: flex; align-items: center; gap: 8px; padding: 10px 0 10px 14px;
+  margin-bottom: 8px; border-left: 3px solid var(--accent);
   cursor: pointer; user-select: none;
   background: var(--surface);
   transition: box-shadow 0.2s;
@@ -546,26 +549,26 @@ defineExpose({ renamingBlockId, editingBlockId })
 .block-toggle.collapsed { transform: rotate(-90deg); }
 .block-title {
   font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;
-  color: #2d2520; flex: 1; letter-spacing: 0.01em;
+  color: var(--accent); flex: 1; letter-spacing: 0.01em;
 }
 .block-star { color: var(--accent); margin-right: 4px; }
 .block-title-input {
   flex: 1; border: none; background: var(--surface-hover);
   font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;
-  color: #2d2520; outline: none; padding: 2px 6px; border-radius: 4px;
+  color: var(--accent); outline: none; padding: 2px 6px; border-radius: 4px;
 }
 .block-actions {
   display: flex; gap: 4px; transition: opacity 0.15s;
 }
 
 .block-copy-btn {
-  display: flex; align-items: center; gap: 4px; padding: 4px 10px;
-  border: 1px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; gap: 4px; padding: 4px 12px;
+  border: 1px solid var(--accent); background: var(--accent-light);
   border-radius: 6px; cursor: pointer; font-family: inherit;
-  font-size: 11px; color: var(--text-muted); transition: all 0.15s;
-  white-space: nowrap; flex-shrink: 0;
+  font-size: 11px; color: var(--accent); transition: all 0.15s;
+  white-space: nowrap; flex-shrink: 0; font-weight: 500;
 }
-.block-copy-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.block-copy-btn:hover { background: var(--accent); color: white; }
 
 .block-btn {
   width: 26px; height: 26px;
@@ -611,12 +614,13 @@ defineExpose({ renamingBlockId, editingBlockId })
 /* Add block */
 .add-block-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 16px; margin-top: 16px; border: 1px dashed var(--border);
-  border-radius: var(--radius); cursor: pointer; color: var(--text-muted);
+  padding: 16px; margin-top: 16px; border: none;
+  border-top: 1px dashed var(--border);
+  cursor: pointer; color: var(--text-muted);
   font-size: 13px; transition: all 0.15s; background: none; font-family: inherit; width: 100%;
 }
 .add-block-btn:hover {
-  border-color: var(--accent); color: var(--accent); background: var(--accent-light);
+  color: var(--accent);
 }
 
 /* Search highlight */
@@ -671,10 +675,10 @@ defineExpose({ renamingBlockId, editingBlockId })
 /* Markdown */
 .md-wrapper {
   display: grid; grid-template-columns: 1fr; gap: 0;
-  max-width: 800px;
+  max-width: 1000px;
 }
 .md-wrapper.editing {
-  grid-template-columns: 1fr auto 1fr; gap: 0; max-width: 1200px;
+  grid-template-columns: 1fr auto 1fr; gap: 0; max-width: 1400px;
 }
 .md-preview-pane { min-width: 0; padding-right: 16px; }
 .md-edit-pane { min-width: 0; padding-left: 16px; }

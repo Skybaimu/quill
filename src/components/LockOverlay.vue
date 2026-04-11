@@ -32,7 +32,7 @@
               @mouseenter="continuePattern(i-1)"
             ></div>
           </div>
-          <canvas class="pattern-canvas" ref="patternCanvas" width="160" height="160"></canvas>
+          <canvas class="pattern-canvas" ref="patternCanvas" width="240" height="240"></canvas>
         </div>
         <div class="pattern-hint" :class="{ error: patternHintType === 'error', success: patternHintType === 'success' }">{{ patternHint }}</div>
       </div>
@@ -130,7 +130,7 @@
               @mouseenter="continueSetupPattern(i-1)"
             ></div>
           </div>
-          <canvas class="pattern-canvas" ref="setupPatternCanvas" width="160" height="160"></canvas>
+          <canvas class="pattern-canvas" ref="setupPatternCanvas" width="240" height="240"></canvas>
         </div>
         <div class="pattern-hint" :class="{ error: setupHintType === 'error' }">{{ setupHint }}</div>
         <div v-if="setupConfirmed" class="pattern-hint success" style="display:block">请再次绘制确认</div>
@@ -183,7 +183,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { store, showToast } from '../stores/useStore.js'
+import { store, showToast, hasGlobalPassword, getGlobalPasswordRecord, setGlobalPassword } from '../stores/useStore.js'
 import {
   createPasswordFileRecord, verifyPattern, verifyPin,
   verifySecurityAnswer, isEncrypted, isNewPasswordFormat,
@@ -229,8 +229,11 @@ const setupSecurityQuestions = ref([
 
 // --- 密码记录元信息 ---
 const currentRecord = computed(() => {
-  if (!store.lockFileId) return null
-  return store.passwords[store.lockFileId]
+  // 优先使用文件独立密码，否则使用全局密码
+  if (store.lockFileId && store.passwords[store.lockFileId]) {
+    return store.passwords[store.lockFileId]
+  }
+  return getGlobalPasswordRecord()
 })
 
 const hasPattern = computed(() => {
@@ -314,15 +317,16 @@ function drawPattern() {
   const canvas = patternCanvas.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, 160, 160)
+  ctx.clearRect(0, 0, 240, 240)
   if (patternDots.value.length > 0) {
     ctx.strokeStyle = '#c45d3a'
-    ctx.lineWidth = 2
+    ctx.lineWidth = 3
     ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     ctx.beginPath()
     patternDots.value.forEach((idx, i) => {
-      const x = (idx % 3) * 60 + 10
-      const y = Math.floor(idx / 3) * 60 + 10
+      const x = (idx % 3) * 80 + 40
+      const y = Math.floor(idx / 3) * 80 + 40
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
     })
     ctx.stroke()
@@ -371,7 +375,7 @@ function resetPattern() {
   patternHint.value = '连接至少 4 个点'
   patternHintType.value = ''
   const canvas = patternCanvas.value
-  if (canvas) canvas.getContext('2d').clearRect(0, 0, 160, 160)
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, 240, 240)
 }
 
 // --- 数字解锁 ---
@@ -441,7 +445,7 @@ function resetSetup() {
   patternSetInSetup.value = false
   setupSecurityQuestions.value = [{ question: '', answer: '' }]
   const canvas = setupPatternCanvas.value
-  if (canvas) canvas.getContext('2d').clearRect(0, 0, 160, 160)
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, 240, 240)
 }
 
 function goStep2() {
@@ -475,15 +479,16 @@ function drawSetupPattern() {
   const canvas = setupPatternCanvas.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, 160, 160)
+  ctx.clearRect(0, 0, 240, 240)
   if (setupDots.value.length > 0) {
     ctx.strokeStyle = '#c45d3a'
-    ctx.lineWidth = 2
+    ctx.lineWidth = 3
     ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     ctx.beginPath()
     setupDots.value.forEach((idx, i) => {
-      const x = (idx % 3) * 60 + 10
-      const y = Math.floor(idx / 3) * 60 + 10
+      const x = (idx % 3) * 80 + 40
+      const y = Math.floor(idx / 3) * 80 + 40
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
     })
     ctx.stroke()
@@ -568,16 +573,15 @@ async function finishSetup() {
 
   verifying.value = true
   const record = await createPasswordFileRecord(patternText, pinText, questions)
-  if (store.lockFileId) {
-    store.passwords[store.lockFileId] = record
-  }
+  // 存为全局密码
+  setGlobalPassword(record)
   verifying.value = false
   close()
   if (store.lockCallback) store.lockCallback()
   const methods = []
   if (pinText) methods.push('数字')
   if (patternText) methods.push('图案')
-  showToast('密码设置成功 (' + methods.join('+') + ')')
+  showToast('全局密码设置成功 (' + methods.join('+') + ')')
 }
 
 function close() {
@@ -612,10 +616,10 @@ function close() {
 }
 
 /* Pattern */
-.pattern-wrap { position: relative; width: 160px; height: 160px; margin-bottom: 20px; }
-.pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+.pattern-wrap { position: relative; width: 240px; height: 240px; margin-bottom: 20px; }
+.pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); height: 100%; align-content: space-evenly; justify-items: center; }
 .pattern-dot {
-  width: 18px; height: 18px; border-radius: 50%; background: var(--border);
+  width: 20px; height: 20px; border-radius: 50%; background: var(--border);
   cursor: pointer; transition: all 0.15s;
 }
 .pattern-dot.active { background: var(--accent); transform: scale(1.3); box-shadow: 0 0 0 4px var(--accent-light); }

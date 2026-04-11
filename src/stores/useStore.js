@@ -230,7 +230,7 @@ export function selectFile(id) {
   const file = findFile(id)
   if (!file) return
   if (file.locked) {
-    store.lockFileId = id
+    store.lockFileId = '__global__'
     store.lockMode = 'unlock'
     store.lockCallback = () => {
       store.currentFile = id
@@ -277,7 +277,7 @@ export function addFile() {
   const isMd = tag === 'Markdown'
   const file = {
     id: 'f' + uid(),
-    name: catName + (files.length + 1),
+    name: catName + ' ' + (files.length + 1),
     tag,
     pinned: false,
     starred: false,
@@ -442,13 +442,35 @@ export function importFromJson(jsonStr, mode = 'merge') {
 }
 
 // Trigger file download
-export function downloadFile(content, filename, mimeType = 'text/plain') {
+export async function downloadFile(content, filename, mimeType = 'text/plain') {
+  // Tauri 环境：弹出保存对话框
+  if (typeof window !== 'undefined' && window.__TAURI__) {
+    try {
+      const { save } = window.__TAURI__.dialog
+      const { writeTextFile } = window.__TAURI__.fs
+      const filePath = await save({
+        defaultPath: filename,
+        filters: [{ name: 'All', extensions: [filename.split('.').pop() || 'txt'] }]
+      })
+      if (filePath) {
+        await writeTextFile(filePath, content)
+        showToast('已保存到: ' + filePath)
+        return
+      }
+      return // 用户取消
+    } catch (e) {
+      // Tauri API 不可用，fallback 到浏览器方式
+    }
+  }
+  // 浏览器环境
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
 
@@ -470,6 +492,25 @@ export function showToast(msg) {
   store.toastTimer = setTimeout(() => {
     store.toastVisible = false
   }, 2000)
+}
+
+// Global password helpers
+const GLOBAL_PW_KEY = '__global__'
+
+export function hasGlobalPassword() {
+  return !!store.passwords[GLOBAL_PW_KEY]
+}
+
+export function getGlobalPasswordRecord() {
+  return store.passwords[GLOBAL_PW_KEY] || null
+}
+
+export function setGlobalPassword(record) {
+  store.passwords[GLOBAL_PW_KEY] = record
+}
+
+export function removeGlobalPassword() {
+  delete store.passwords[GLOBAL_PW_KEY]
 }
 
 export { store, uid }

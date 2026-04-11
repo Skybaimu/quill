@@ -68,7 +68,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { store, findFile, deleteFile, deleteCategory, duplicateFile, exportFileAsText, downloadFile, showToast } from '../stores/useStore.js'
+import { store, findFile, deleteFile, deleteCategory, duplicateFile, exportFileAsText, downloadFile, showToast, hasGlobalPassword } from '../stores/useStore.js'
 
 const targetFile = computed(() => {
   if (store.ctxType !== 'file' || !store.ctxTarget) return null
@@ -125,17 +125,29 @@ function doAction(act) {
       }
       case 'lock':
         if (file.locked) {
-          file.locked = false
-          delete store.passwords[target]
-          showToast('已取消密码保护')
-        } else {
-          store.lockFileId = target
-          store.lockMode = 'setup'
+          // 需要输入密码才能取消保护
+          store.lockFileId = '__global__'
+          store.lockMode = 'unlock'
           store.lockCallback = () => {
-            file.locked = true
-            showToast('已设置密码保护')
+            file.locked = false
+            showToast('已取消密码保护')
           }
           store.lockVisible = true
+        } else {
+          if (hasGlobalPassword()) {
+            // 已有全局密码，直接锁定
+            file.locked = true
+            showToast('已设置密码保护')
+          } else {
+            // 没有全局密码，先设置
+            store.lockFileId = '__global__'
+            store.lockMode = 'setup'
+            store.lockCallback = () => {
+              file.locked = true
+              showToast('已设置密码保护')
+            }
+            store.lockVisible = true
+          }
         }
         break
       case 'delete':

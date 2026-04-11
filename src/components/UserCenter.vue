@@ -59,6 +59,22 @@
         </div>
 
         <div class="uc-section">
+          <div class="uc-section-title">密码管理</div>
+          <div class="uc-pw-actions">
+            <button class="uc-pw-btn" @click="handleSetPassword">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              {{ hasGlobalPw ? '更换密码' : '设置密码' }}
+            </button>
+            <button class="uc-pw-btn" v-if="hasGlobalPw" @click="handleDeletePassword">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              删除密码
+            </button>
+          </div>
+          <div class="uc-pw-hint" v-if="hasGlobalPw">已设置全局密码，保护 {{ lockedCount }} 个文件</div>
+          <div class="uc-pw-hint" v-else>未设置密码，文件无法加密保护</div>
+        </div>
+
+        <div class="uc-section">
           <div class="uc-section-title">快捷键</div>
           <div class="uc-shortcuts">
             <div class="uc-shortcut"><span class="sc-key">Ctrl+N</span><span>新建文件</span></div>
@@ -72,8 +88,10 @@
         <div class="uc-section">
           <div class="uc-section-title">关于</div>
           <div class="uc-about">
-            <span class="uc-version">Quill v3</span>
+            <span class="uc-version">Quill v4</span>
             <span class="uc-desc">轻量笔记工具 · Tauri + Vue 3</span>
+            <span class="uc-author">作者：Sky白木</span>
+            <span class="uc-email">skybaimu@gmail.com</span>
           </div>
         </div>
       </div>
@@ -83,7 +101,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { store } from '../stores/useStore.js'
+import { store, hasGlobalPassword, removeGlobalPassword } from '../stores/useStore.js'
 
 const showPanel = ref(false)
 
@@ -111,6 +129,35 @@ const stats = computed(() => {
   return { categories: store.categories.length, files, locked }
 })
 
+const hasGlobalPw = computed(() => hasGlobalPassword())
+const lockedCount = computed(() => stats.value.locked)
+
+function handleSetPassword() {
+  store.lockFileId = '__global__'
+  store.lockMode = 'setup'
+  store.lockCallback = () => {
+    showToast('全局密码设置成功')
+  }
+  store.lockVisible = true
+}
+
+function handleDeletePassword() {
+  // 需要先验证当前密码
+  store.lockFileId = '__global__'
+  store.lockMode = 'unlock'
+  store.lockCallback = () => {
+    removeGlobalPassword()
+    // 同时解锁所有文件
+    for (const catId in store.files) {
+      for (const f of store.files[catId]) {
+        f.locked = false
+      }
+    }
+    showToast('已删除全局密码，所有文件已解锁')
+  }
+  store.lockVisible = true
+}
+
 const fileStats = computed(() => {
   return `${stats.value.files} 个文件`
 })
@@ -124,9 +171,9 @@ function setFontSize(size) {
   localStorage.setItem('quill-fontsize', size)
   const root = document.documentElement
   switch (size) {
-    case 'small': root.style.fontSize = '13px'; break
-    case 'medium': root.style.fontSize = '14px'; break
-    case 'large': root.style.fontSize = '16px'; break
+    case 'small': root.style.setProperty('--app-font-size', '12px'); break
+    case 'medium': root.style.setProperty('--app-font-size', '14px'); break
+    case 'large': root.style.setProperty('--app-font-size', '16px'); break
   }
 }
 
@@ -252,4 +299,17 @@ watch(() => store.sidebarCollapsed, (v) => {
 .uc-about { display: flex; flex-direction: column; gap: 2px; }
 .uc-version { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .uc-desc { font-size: 11px; color: var(--text-muted); }
+.uc-author { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.uc-email { font-size: 11px; color: var(--accent); }
+
+/* Password management */
+.uc-pw-actions { display: flex; flex-direction: column; gap: 4px; }
+.uc-pw-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border); background: var(--surface); cursor: pointer;
+  border-radius: 6px; font-family: inherit; font-size: 12px;
+  color: var(--text-secondary); transition: all 0.15s;
+}
+.uc-pw-btn:hover { border-color: var(--accent); color: var(--accent); }
+.uc-pw-hint { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
 </style>
