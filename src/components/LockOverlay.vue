@@ -75,6 +75,10 @@
       </div>
     </template>
 
+    <div v-if="verifying" class="verifying-indicator">
+      <div class="spinner"></div>
+      <span>安全验证中...</span>
+    </div>
     <button class="cancel-btn" @click="close">取消</button>
   </div>
 </template>
@@ -82,6 +86,10 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { store, showToast } from '../stores/useStore.js'
+import { createPasswordRecord, verifyPassword, isEncryptedRecord, migratePassword } from '../utils/crypto.js'
+
+// 异步验证锁 — 防止 UI 阻塞
+const verifying = ref(false)
 
 const tab = ref('pattern')
 const patternDots = ref([])
@@ -113,11 +121,30 @@ watch(() => store.lockVisible, (v) => {
     resetPattern()
     resetPin()
     resetSetup()
+    verifying.value = false
+    migrateOldPassword()
   }
 })
 
+/**
+ * 检测并迁移旧格式密码（明文 → PBKDF2 哈希）
+ * 旧格式：{ pattern: "012456" } / { pin: "1234" }
+ * 新格式：{ type: "pattern", salt: "...", hash: "..." }
+ */
+async function migrateOldPassword() {
+  if (!store.lockFileId) return
+  const record = store.passwords[store.lockFileId]
+  if (!record || isEncryptedRecord(record)) return
+  // 旧格式，静默迁移
+  const migrated = await migratePassword(record)
+  if (migrated) {
+    store.passwords[store.lockFileId] = migrated
+  }
+}
+
 // Pattern unlock
 function startPattern(idx) {
+  if (verifying.value) return
   patternDrawing.value = true
   patternDots.value = [idx]
   drawPattern()
@@ -161,7 +188,7 @@ watch(patternDrawing, (drawing) => {
   }
 })
 
-function endPattern() {
+async function endPattern() {
   const p = patternDots.value.join('')
   if (p.length < 4) {
     patternHint.value = '至少 4 个点'
@@ -169,8 +196,29 @@ function endPattern() {
     setTimeout(resetPattern, 600)
     return
   }
-  const s = store.passwords[store.lockFileId]
-  if (s?.pattern === p) {
+
+  verifying.value = true
+  patternHint.value = '验证中...'
+  patternHintType.value = ''
+
+  const record = store.passwords[store.lockFileId]
+  let ok = false
+
+  if (isEncryptedRecord(record)) {
+    ok = await verifyPassword(p, record)
+  } else if (record?.pattern !== undefined) {
+    // 旧格式兼容
+    ok = record.pattern === p
+    if (ok) {
+      // 迁移到新格式
+      const migrated = await migratePassword(record)
+      if (migrated) store.passwords[store.lockFileId] = migrated
+    }
+  }
+
+  verifying.value = false
+
+  if (ok) {
     patternHint.value = '验证成功'
     patternHintType.value = 'success'
     setTimeout(() => {
@@ -199,6 +247,7 @@ function resetPattern() {
 
 // PIN unlock
 function pinKey(k) {
+  if (verifying.value) return
   if (k === '⌫') {
     pinValue.value = pinValue.value.slice(0, -1)
   } else if (pinValue.value.length < 4) {
@@ -209,9 +258,25 @@ function pinKey(k) {
   }
 }
 
-function verifyPin() {
-  const s = store.passwords[store.lockFileId]
-  if (s?.pin === pinValue.value) {
+async function verifyPin() {
+  verifying.value = true
+  const record = store.passwords[store.lockFileId]
+  let ok = false
+
+  if (isEncryptedRecord(record)) {
+    ok = await verifyPassword(pinValue.value, record)
+  } else if (record?.pin !== undefined) {
+    // 旧格式兼容
+    ok = record.pin === pinValue.value
+    if (ok) {
+      const migrated = await migratePassword(record)
+      if (migrated) store.passwords[store.lockFileId] = migrated
+    }
+  }
+
+  verifying.value = false
+
+  if (ok) {
     close()
     if (store.lockCallback) store.lockCallback()
   } else {
@@ -269,7 +334,7 @@ watch(setupDrawing, (drawing) => {
   }
 })
 
-function endSetupPattern() {
+async function endSetupPattern() {
   const p = setupDots.value.join('')
   if (p.length < 4) {
     setupHint.value = '至少 4 个点'
@@ -287,7 +352,11 @@ function endSetupPattern() {
     return
   }
   if (setupFirst.value === p) {
-    if (store.lockFileId) store.passwords[store.lockFileId] = { pattern: p }
+    // 使用 PBKDF2 哈希存储
+    if (store.lockFileId) {
+      const record = await createPasswordRecord(p, 'pattern')
+      store.passwords[store.lockFileId] = record
+    }
     close()
     if (store.lockCallback) store.lockCallback()
     showToast('密码设置成功')
@@ -311,7 +380,7 @@ function resetSetup() {
   setupPin2.value = ''
 }
 
-function saveSetupPin() {
+async function saveSetupPin() {
   const p1 = setupPin1.value
   const p2 = setupPin2.value
   if (p1.length !== 4 || !/^\d+$/.test(p1)) {
@@ -322,7 +391,11 @@ function saveSetupPin() {
     showToast('两次输入不一致')
     return
   }
-  if (store.lockFileId) store.passwords[store.lockFileId] = { pin: p1 }
+  // 使用 PBKDF2 哈希存储
+  if (store.lockFileId) {
+    const record = await createPasswordRecord(p1, 'pin')
+    store.passwords[store.lockFileId] = record
+  }
   close()
   if (store.lockCallback) store.lockCallback()
   showToast('密码设置成功')
@@ -332,6 +405,7 @@ function close() {
   store.lockVisible = false
   store.lockCallback = null
   store.lockFileId = null
+  verifying.value = false
 }
 </script>
 
@@ -391,6 +465,17 @@ function close() {
   font-size: 13px; transition: all 0.15s; margin-top: 8px;
 }
 .setup-btn:hover { background: var(--text-secondary); }
+
+.verifying-indicator {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  font-size: 12px; color: var(--text-muted);
+}
+.spinner {
+  width: 14px; height: 14px; border: 2px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .cancel-btn {
   padding: 6px 11px; border: none; background: transparent; cursor: pointer;
