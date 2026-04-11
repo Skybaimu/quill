@@ -352,6 +352,12 @@ export function duplicateFile(fileId) {
 }
 
 export function deleteCategory(catId) {
+  // 默认四个分类不可删除
+  const DEFAULT_CATS = new Set(['c1', 'c2', 'c3', 'c4'])
+  if (DEFAULT_CATS.has(catId)) {
+    showToast('默认分类不可删除')
+    return false
+  }
   if (store.categories.length <= 1) return false
   store.categories = store.categories.filter(c => c.id !== catId)
   delete store.files[catId]

@@ -37,7 +37,8 @@
             :class="{
               active: cat.id === store.currentCat,
               pinned: cat.pinned,
-              'drag-over': dragOverId === cat.id
+              'drag-over': dragOverId === cat.id,
+              'is-default': isDefaultCat(cat.id)
             }"
             draggable="true"
             @click="selectCategory(cat.id)"
@@ -64,6 +65,11 @@
             <template v-else>
               <span class="cat-name">{{ cat.name || '未命名分类' }}</span>
               <span class="cat-count">{{ getFileCount(cat.id) }}</span>
+              <button class="cat-more" @click.stop="openCatContext($event, cat)" title="更多操作">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                </svg>
+              </button>
             </template>
           </div>
         </div>
@@ -141,6 +147,12 @@ const catNameInputRef = ref(null)
 const dragCatId = ref(null)
 const dragOverId = ref(null)
 const showImportExport = ref(false)
+
+const DEFAULT_CAT_IDS = new Set(['c1', 'c2', 'c3', 'c4'])
+
+function isDefaultCat(id) {
+  return DEFAULT_CAT_IDS.has(id)
+}
 
 const sortedCategories = computed(() => getSortedCategories())
 
@@ -318,8 +330,8 @@ function onDragEnd() {
 }
 .cat-item:hover { background: var(--surface-hover); color: var(--text-primary); }
 .cat-item.active { background: var(--accent-light); color: var(--accent); }
-.cat-item.dragging { opacity: 0.4; }
-.cat-item.drag-over { border-top: 2px solid var(--accent); padding-top: 7px; }
+.cat-item.dragging { opacity: 0.3; transform: scale(0.96); }
+.cat-item.drag-over { border-top: 3px solid var(--accent); padding-top: 6px; background: var(--accent-light); }
 
 .cat-pin {
   position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
@@ -333,6 +345,15 @@ function onDragEnd() {
 }
 .cat-count { font-size: 11px; color: var(--text-muted); }
 .cat-item.active .cat-count { color: var(--accent); }
+
+.cat-more {
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
+  opacity: 0;
+}
+.cat-item:hover .cat-more { opacity: 1; }
+.cat-more:hover { background: var(--surface-hover); color: var(--text-primary); }
 
 .cat-input {
   flex: 1; border: none; background: var(--surface-hover);

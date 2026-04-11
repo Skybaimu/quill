@@ -391,8 +391,8 @@ defineExpose({ editingFileId })
 }
 .file-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
 .file-item.active { background: var(--surface); box-shadow: var(--shadow-md); }
-.file-item.dragging { opacity: 0.4; }
-.file-item.drag-over { border-top: 2px solid var(--accent); padding-top: 10px; }
+.file-item.dragging { opacity: 0.3; transform: scale(0.98); }
+.file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 9px; background: var(--accent-light); }
 
 .file-item-top { display: flex; align-items: flex-start; gap: 4px; }
 .file-name {
