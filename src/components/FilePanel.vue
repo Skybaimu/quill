@@ -23,7 +23,7 @@
         <input
           type="text"
           class="search-input"
-          placeholder="搜索文件..."
+          placeholder="搜索文件... (Ctrl+/)"
           v-model="store.searchQuery"
           @keydown.escape="store.searchQuery = ''"
         />
@@ -85,11 +85,12 @@
             </svg>
           </button>
         </div>
-        <div class="file-preview">{{ getFilePreview(file) }}</div>
+        <div class="file-preview" v-html="getFilePreviewHtml(file)"></div>
         <div class="file-meta">
           <span class="file-tag" :class="'tag-' + file.tag?.toLowerCase()">{{ file.tag }}</span>
           <span v-if="file.locked" class="file-lock">🔒</span>
           <span class="file-count">{{ getFileItemCount(file) }} {{ file.type === 'markdown' ? '字符' : '条' }}</span>
+          <span class="file-time" v-if="file.updatedAt">{{ getFileTime(file) }}</span>
         </div>
       </div>
 
@@ -110,7 +111,8 @@
 import { computed, ref, nextTick, watch } from 'vue'
 import {
   store, getSortedFiles, getPreview, selectFile as storeSelectFile,
-  addFile as storeAddFile, getCurrentCat, showToast
+  addFile as storeAddFile, getCurrentCat,
+  highlightText, formatTime, showToast
 } from '../stores/useStore.js'
 
 const scopes = [
@@ -160,6 +162,13 @@ const filteredFiles = computed(() => {
 })
 
 function getFilePreview(file) { return getPreview(file) }
+function getFilePreviewHtml(file) {
+  const text = getPreview(file)
+  const q = store.searchQuery.trim()
+  if (q) return highlightText(text, q)
+  return text
+}
+function getFileTime(file) { return formatTime(file.updatedAt) }
 function getFileItemCount(file) {
   if (file.type === 'markdown') return (file.content || '').length
   return (file.blocks || []).reduce((a, b) => a + (b.items || []).length, 0)
@@ -337,6 +346,15 @@ defineExpose({ editingFileId })
 }
 .file-lock { font-size: 11px; }
 .file-count { font-size: 11px; }
+.file-time { font-size: 10px; margin-left: auto; color: var(--text-muted); }
+
+/* Search highlight */
+:deep(.search-hl) {
+  background: #fef08a;
+  color: inherit;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
 
 .file-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

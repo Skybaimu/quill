@@ -4,6 +4,11 @@
       <div class="logo" v-show="!store.sidebarCollapsed">
         <span class="logo-q">q</span>uill
       </div>
+      <button class="icon-btn import-export-btn" @click="showImportExport = !showImportExport" title="导入/导出" v-show="!store.sidebarCollapsed">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+      </button>
       <button class="toggle-btn" @click="store.sidebarCollapsed = !store.sidebarCollapsed" :title="store.sidebarCollapsed ? '展开' : '收起'">
         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path v-if="!store.sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
@@ -85,6 +90,19 @@
           </div>
         </div>
       </div>
+      <div class="import-export-panel" v-if="showImportExport">
+        <div class="ie-title">导入 / 导出</div>
+        <button class="ie-btn" @click="doExportAll">
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          导出全部数据
+        </button>
+        <label class="ie-btn ie-import">
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          导入数据
+          <input type="file" accept=".json" @change="doImport" hidden />
+        </label>
+        <div class="ie-hint">导出为 JSON 文件，可备份或迁移数据</div>
+      </div>
     </div>
 
     <!-- Collapsed icon-only mode -->
@@ -105,7 +123,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { store, getSortedCategories, getFileCount, selectCategory as storeSelectCategory, addCategory as storeAddCategory, showToast } from '../stores/useStore.js'
+import { store, getSortedCategories, getFileCount, selectCategory as storeSelectCategory, addCategory as storeAddCategory, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast } from '../stores/useStore.js'
 
 const ICONS = {
   sparkle: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>',
@@ -118,6 +136,7 @@ const editingCatId = ref(null)
 const catNameInputRef = ref(null)
 const dragCatId = ref(null)
 const dragOverId = ref(null)
+const showImportExport = ref(false)
 
 const sortedCategories = computed(() => getSortedCategories())
 
@@ -168,6 +187,29 @@ function jumpToStarred(item) {
     store.currentFile = item.fileId
     store.filePanelCollapsed = false
   })
+}
+
+// Import/Export
+function doExportAll() {
+  const json = exportAllAsJson()
+  downloadFile(json, 'quill-backup-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
+  showToast('已导出全部数据')
+  showImportExport.value = false
+}
+
+async function doImport(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  try {
+    const text = await readFileAsText(file)
+    if (confirm('导入将合并到现有数据，是否继续？\n\n点"确定"合并，点"取消"中止')) {
+      importFromJson(text, 'merge')
+    }
+  } catch (err) {
+    showToast('读取文件失败')
+  }
+  e.target.value = ''
+  showImportExport.value = false
 }
 
 // Drag & drop for categories
@@ -322,4 +364,19 @@ function onDragEnd() {
   text-overflow: ellipsis; color: var(--text-primary);
 }
 .starred-cat { font-size: 10px; color: var(--text-muted); }
+
+/* Import/Export panel */
+.import-export-panel {
+  padding: 12px; margin: 4px 8px; background: var(--surface-hover);
+  border-radius: var(--radius); border: 1px solid var(--border-light);
+}
+.ie-title { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+.ie-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px;
+  border: none; background: transparent; cursor: pointer; border-radius: 6px;
+  font-family: inherit; font-size: 12px; color: var(--text-secondary); transition: all 0.1s;
+}
+.ie-btn:hover { background: var(--surface); color: var(--text-primary); }
+.ie-import { cursor: pointer; }
+.ie-hint { font-size: 10px; color: var(--text-muted); margin-top: 6px; padding: 0 4px; }
 </style>

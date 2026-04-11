@@ -3,7 +3,7 @@
     <!-- Header toolbar -->
     <div class="content-header">
       <div class="content-header-left">
-        <button class="toggle-btn" @click="store.sidebarCollapsed = !store.sidebarCollapsed" title="切换侧栏">
+        <button class="toggle-btn" @click="store.sidebarCollapsed = !store.sidebarCollapsed" title="切换侧栏 (Ctrl+B)">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
@@ -17,6 +17,7 @@
           <span class="bc-cat">{{ currentCatName }}</span>
           <span class="bc-sep">/</span>
           <span class="bc-file">{{ currentFile.name }}</span>
+          <span class="bc-time" v-if="fileTime"> · {{ fileTime }}</span>
         </div>
         <div class="content-breadcrumb" v-else>选择文件</div>
       </div>
@@ -28,8 +29,8 @@
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
         <template v-if="currentFile.type !== 'markdown'">
-          <button class="action-btn" @click="doExpandAll">展开全部</button>
-          <button class="action-btn" @click="doCollapseAll">折叠全部</button>
+          <button class="action-btn" @click="doExpandAll" title="展开全部">展开全部</button>
+          <button class="action-btn" @click="doCollapseAll" title="折叠全部">折叠全部</button>
         </template>
         <button class="action-btn primary" @click="doCopyAll">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,6 +49,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
         <p>选择或创建一个文件</p>
+        <p class="empty-hint">Ctrl+N 新建文件 · Ctrl+B 切换侧栏</p>
       </div>
 
       <!-- Markdown file -->
@@ -57,7 +59,12 @@
             <div class="content-file-title">{{ currentFile.name }}</div>
             <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
           </div>
-          <div class="md-edit-pane" v-if="store.mdEditMode">
+          <div
+            class="md-resizer"
+            v-if="store.mdEditMode"
+            @mousedown.prevent="startMdResize"
+          ></div>
+          <div class="md-edit-pane" v-if="store.mdEditMode" :style="{ flex: mdEditFlex }">
             <textarea
               class="md-source"
               :value="currentFile.content || ''"
@@ -74,7 +81,7 @@
           <div class="content-file-title">{{ currentFile.name }}</div>
 
           <div
-            v-for="block in sortedBlocks"
+            v-for="block in visibleBlocks"
             :key="block.id"
             class="content-block"
             :data-block-id="block.id"
@@ -101,7 +108,7 @@
               <template v-else>
                 <div class="block-title">
                   <span v-if="block.starred" class="block-star">★</span>
-                  {{ block.title }}
+                  <span v-html="hlText(block.title)"></span>
                 </div>
               </template>
 
@@ -128,7 +135,7 @@
                     <div class="api-inner">
                       <div class="api-label">{{ item.label }}</div>
                       <div class="api-value">
-                        <span>{{ item.text }}</span>
+                        <span v-html="hlText(item.text)"></span>
                         <button class="api-copy" @click.stop="copyText(item.text, item.label)">复制</button>
                       </div>
                     </div>
@@ -147,7 +154,10 @@
                       v-if="editingBlockId !== block.id"
                       class="block-text-display"
                       @click="startEdit(block)"
-                    >{{ item.text || '' }}</div>
+                    >
+                      <span v-if="hasQuery" v-html="hlText(item.text)"></span>
+                      <span v-else>{{ item.text || '' }}</span>
+                    </div>
                     <textarea
                       v-else
                       class="block-textarea"
@@ -163,8 +173,13 @@
             </transition>
           </div>
 
+          <!-- Search no-results hint -->
+          <div class="search-no-blocks" v-if="hasQuery && visibleBlocks.length === 0 && currentFile">
+            <p>此文件中没有匹配的内容块</p>
+          </div>
+
           <!-- Add block -->
-          <button class="add-block-btn" @click="handleAddBlock">
+          <button class="add-block-btn" @click="handleAddBlock" v-if="!hasQuery">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -182,21 +197,36 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch } from 'vue'
-import { store, findFile, getCurrentCat, addBlock as storeAddBlock, deleteBlock, showToast } from '../stores/useStore.js'
+import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import {
+  store, findFile, getCurrentCat, addBlock as storeAddBlock, deleteBlock,
+  addFile as storeAddFile, selectFile as storeSelectFile,
+  highlightText, blockMatchesQuery, formatTime, showToast
+} from '../stores/useStore.js'
 
 const contentBodyRef = ref(null)
 const blockTextareaRef = ref(null)
 const blockRenameRef = ref(null)
 const editingBlockId = ref(null)
 const renamingBlockId = ref(null)
+const mdEditFlex = ref(1)
 
 const currentFile = computed(() => findFile(store.currentFile))
 const currentCatName = computed(() => getCurrentCat()?.name || '')
+const hasQuery = computed(() => store.searchQuery.trim().length > 0)
+
+const fileTime = computed(() => formatTime(currentFile.value?.updatedAt))
 
 const sortedBlocks = computed(() => {
   if (!currentFile.value?.blocks) return []
   return [...currentFile.value.blocks].sort((a, b) => a.order - b.order)
+})
+
+// Visible blocks: filter by search query
+const visibleBlocks = computed(() => {
+  if (!hasQuery.value) return sortedBlocks.value
+  const q = store.searchQuery.trim()
+  return sortedBlocks.value.filter(b => blockMatchesQuery(b, q))
 })
 
 const wordCount = computed(() => {
@@ -204,6 +234,13 @@ const wordCount = computed(() => {
   if (currentFile.value.type === 'markdown') return (currentFile.value.content || '').length
   return (currentFile.value.blocks || []).flatMap(b => (b.items || []).map(i => i.text)).join('').length
 })
+
+// Highlight helper
+function hlText(text) {
+  if (!text) return ''
+  if (!hasQuery.value) return text.replace(/</g, '&lt;')
+  return highlightText(text.replace(/</g, '&lt;'), store.searchQuery.trim())
+}
 
 // Markdown rendering
 function renderMd(text) {
@@ -230,6 +267,28 @@ function onMdInput(val) {
 
 function toggleMdEdit() {
   store.mdEditMode = !store.mdEditMode
+}
+
+// Markdown split pane resize
+function startMdResize(e) {
+  const wrapper = contentBodyRef.value?.querySelector('.md-wrapper')
+  if (!wrapper) return
+  const startX = e.clientX
+  const rect = wrapper.getBoundingClientRect()
+  const startRatio = 0.5
+
+  function onMove(ev) {
+    const dx = ev.clientX - startX
+    const ratio = Math.max(0.2, Math.min(0.8, startRatio + dx / rect.width))
+    mdEditFlex.value = (1 - ratio) / ratio
+    wrapper.style.gridTemplateColumns = `${ratio * 100}% auto 1fr`
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
 }
 
 // Block operations
@@ -277,7 +336,6 @@ function copyText(text, label) {
 function handleAddBlock() {
   const block = storeAddBlock()
   if (!block) return
-  // Auto-expand and auto-focus
   nextTick(() => {
     editingBlockId.value = block.id
     nextTick(() => {
@@ -333,10 +391,79 @@ function unlockApi(item) {
   store.lockVisible = true
 }
 
+// === Keyboard shortcuts ===
+function handleKeyDown(e) {
+  // Don't handle shortcuts when typing in input/textarea
+  const tag = e.target.tagName
+  const isEditing = tag === 'INPUT' || tag === 'TEXTAREA'
+
+  // Escape: close popups
+  if (e.key === 'Escape') {
+    if (store.lockVisible) { store.lockVisible = false; return }
+    if (store.ctxVisible) { store.ctxVisible = false; return }
+    if (store.blockMenuVisible) { store.blockMenuVisible = false; return }
+    if (editingBlockId.value) { editingBlockId.value = null; return }
+    if (store.searchQuery) { store.searchQuery = ''; return }
+    if (store.mdEditMode) { store.mdEditMode = false; return }
+    return
+  }
+
+  // Ctrl+B: toggle sidebar
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault()
+    store.sidebarCollapsed = !store.sidebarCollapsed
+    return
+  }
+
+  // Don't handle other shortcuts while editing text
+  if (isEditing) return
+
+  // Ctrl+N: new file
+  if (e.ctrlKey && e.key === 'n') {
+    e.preventDefault()
+    const file = storeAddFile()
+    if (file) {
+      nextTick(() => {
+        storeSelectFile(file.id)
+        nextTick(() => {
+          const display = document.querySelector('.block-text-display')
+          if (display) display.click()
+        })
+      })
+    }
+    return
+  }
+
+  // Ctrl+Shift+N: new block
+  if (e.ctrlKey && e.shiftKey && e.key === 'N') {
+    e.preventDefault()
+    handleAddBlock()
+    return
+  }
+
+  // Ctrl+/: focus search
+  if (e.ctrlKey && e.key === '/') {
+    e.preventDefault()
+    store.filePanelCollapsed = false
+    nextTick(() => {
+      const searchInput = document.querySelector('.search-input')
+      if (searchInput) searchInput.focus()
+    })
+    return
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown)
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
+})
+
 // Listen for block rename trigger from BlockMenu
 watch(() => store.blockMenuVisible, (v) => {
   if (!v && store.blockMenuTarget) {
-    // Menu was closed, check if rename was triggered
+    // Menu was closed
   }
 })
 
@@ -364,6 +491,7 @@ defineExpose({ renamingBlockId, editingBlockId })
 .bc-cat { color: var(--text-muted); }
 .bc-sep { margin: 0 6px; color: var(--border); }
 .bc-file { color: var(--text-secondary); }
+.bc-time { color: var(--text-muted); font-size: 11px; }
 
 .toggle-btn {
   width: 28px; height: 28px; flex-shrink: 0;
@@ -478,6 +606,19 @@ defineExpose({ renamingBlockId, editingBlockId })
   border-color: var(--accent); color: var(--accent); background: var(--accent-light);
 }
 
+/* Search highlight */
+:deep(.search-hl) {
+  background: #fef08a;
+  color: inherit;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+/* Search no results */
+.search-no-blocks {
+  text-align: center; padding: 40px 0; color: var(--text-muted); font-size: 13px;
+}
+
 /* API blocks */
 .api-block {
   position: relative; background: #1a1814; border-radius: var(--radius);
@@ -520,10 +661,21 @@ defineExpose({ renamingBlockId, editingBlockId })
   max-width: 800px;
 }
 .md-wrapper.editing {
-  grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1200px;
+  grid-template-columns: 1fr auto 1fr; gap: 0; max-width: 1200px;
 }
-.md-preview-pane { min-width: 0; }
-.md-edit-pane { min-width: 0; }
+.md-preview-pane { min-width: 0; padding-right: 16px; }
+.md-edit-pane { min-width: 0; padding-left: 16px; }
+
+/* Markdown resizer */
+.md-resizer {
+  width: 6px; cursor: col-resize; position: relative;
+  background: var(--border); border-radius: 3px;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.md-resizer:hover, .md-resizer:active {
+  background: var(--accent);
+}
+
 .md-source {
   width: 100%; min-height: 500px; border: 1px solid var(--border);
   border-radius: var(--radius); background: var(--bg);
@@ -564,6 +716,7 @@ defineExpose({ renamingBlockId, editingBlockId })
   height: 100%; min-height: 300px; color: var(--text-muted); text-align: center; gap: 14px;
 }
 .empty-state p { font-size: 14px; }
+.empty-hint { font-size: 12px; opacity: 0.6; }
 
 /* Word count */
 .word-count {

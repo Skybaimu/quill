@@ -154,7 +154,7 @@ export function getFileCount(catId) {
   return (store.files[catId] || []).length
 }
 
-export function getPreview(file) {
+export function getPreview(file, query) {
   if (!file) return ''
   if (file.type === 'markdown') {
     const c = file.content || ''
@@ -168,6 +168,44 @@ export function getPreview(file) {
     }
   }
   return '空文件'
+}
+
+// Escape regex special chars
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Highlight matching text in a string
+export function highlightText(text, query) {
+  if (!query || !text) return text
+  const re = new RegExp(`(${escapeRegex(query)})`, 'gi')
+  return text.replace(re, '<mark class="search-hl">$1</mark>')
+}
+
+// Check if a block matches the search query
+export function blockMatchesQuery(block, query) {
+  if (!query) return true
+  const q = query.toLowerCase()
+  if (block.title.toLowerCase().includes(q)) return true
+  return (block.items || []).some(i =>
+    (i.label || '').toLowerCase().includes(q) ||
+    (i.text || '').toLowerCase().includes(q)
+  )
+}
+
+// Format timestamp to relative time
+export function formatTime(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - ts
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return '刚刚'
+  if (min < 60) return min + ' 分钟前'
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return hr + ' 小时前'
+  const day = Math.floor(hr / 24)
+  if (day < 7) return day + ' 天前'
+  const d = new Date(ts)
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日'
 }
 
 export function getWordCount(file) {
@@ -220,6 +258,17 @@ export function addCategory() {
   return cat
 }
 
+// Auto-assign tag based on category
+function autoTag(catName) {
+  if (!catName) return 'Note'
+  const n = catName.toLowerCase()
+  if (n.includes('提示') || n.includes('prompt')) return 'Prompt'
+  if (n.includes('密码') || n.includes('key') || n.includes('secret')) return 'Secret'
+  if (n.includes('想法') || n.includes('idea')) return 'Idea'
+  if (n.includes('markdown') || n.includes('md')) return 'Markdown'
+  return 'Note'
+}
+
 export function addFile() {
   const files = store.files[store.currentCat] || []
   const cat = getCurrentCat()
@@ -227,7 +276,7 @@ export function addFile() {
   const file = {
     id: 'f' + uid(),
     name: catName + (files.length + 1),
-    tag: 'Note',
+    tag: autoTag(catName),
     pinned: false,
     starred: false,
     order: files.length,
@@ -312,6 +361,95 @@ export function swapOrder(arr, idA, idB) {
   const a = arr.find(x => x.id === idA)
   const b = arr.find(x => x.id === idB)
   if (a && b) [a.order, b.order] = [b.order, a.order]
+}
+
+// Export current file as JSON
+export function exportFileAsJson(fileId) {
+  const file = findFile(fileId)
+  if (!file) return null
+  return JSON.stringify(file, null, 2)
+}
+
+// Export current file as plain text
+export function exportFileAsText(fileId) {
+  const file = findFile(fileId)
+  if (!file) return ''
+  if (file.type === 'markdown') return file.content || ''
+  return (file.blocks || []).map(b => {
+    const title = `## ${b.title}`
+    const items = (b.items || []).map(i => {
+      if (i.label) return `### ${i.label}\n${i.text}`
+      return i.text
+    }).filter(Boolean).join('\n\n')
+    return `${title}\n${items}`
+  }).filter(s => s.length > 3).join('\n\n')
+}
+
+// Export all data as JSON
+export function exportAllAsJson() {
+  const { categories, files, passwords } = store
+  const data = JSON.parse(JSON.stringify({ categories, files, passwords }))
+  data._exportedAt = Date.now()
+  data._version = 2
+  return JSON.stringify(data, null, 2)
+}
+
+// Import data from JSON (merge or replace)
+export function importFromJson(jsonStr, mode = 'merge') {
+  try {
+    const data = JSON.parse(jsonStr)
+    if (!data.categories || !data.files) {
+      showToast('无效的导入文件')
+      return false
+    }
+    if (mode === 'replace') {
+      store.categories = data.categories
+      store.files = data.files
+      store.passwords = data.passwords || {}
+    } else {
+      // Merge: add new categories and files
+      for (const cat of data.categories) {
+        if (!store.categories.find(c => c.id === cat.id)) {
+          store.categories.push(cat)
+        }
+      }
+      for (const catId in data.files) {
+        if (!store.files[catId]) store.files[catId] = []
+        for (const file of data.files[catId]) {
+          if (!store.files[catId].find(f => f.id === file.id)) {
+            store.files[catId].push(file)
+          }
+        }
+      }
+      Object.assign(store.passwords, data.passwords || {})
+    }
+    showToast('导入成功')
+    return true
+  } catch (e) {
+    showToast('导入失败: 文件格式错误')
+    return false
+  }
+}
+
+// Trigger file download
+export function downloadFile(content, filename, mimeType = 'text/plain') {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Read file as text
+export function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsText(file)
+  })
 }
 
 // Toast
