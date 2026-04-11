@@ -111,8 +111,26 @@ const store = reactive({
   // Toast
   toastVisible: false,
   toastMessage: '',
-  toastTimer: null
+  toastTimer: null,
+  // Global lock state
+  globalUnlockedUntil: 0
 })
+
+export function isPasswordFile(id) {
+  return store.files['c2']?.some(f => f.id === id) || false
+}
+
+export function isGlobalUnlocked() {
+  return Date.now() < store.globalUnlockedUntil
+}
+
+export function unlockGlobal() {
+  store.globalUnlockedUntil = Date.now() + 30 * 60 * 1000 // 30 minutes
+}
+
+export function lockGlobal() {
+  store.globalUnlockedUntil = 0
+}
 
 // Auto-save to localStorage
 watch(() => {
@@ -216,29 +234,49 @@ export function getWordCount(file) {
 
 // Actions
 export function selectCategory(id) {
+  console.log(`[Store] selectCategory called with id: ${id}`)
   store.currentCat = id
   store.filePanelCollapsed = false
+  store.searchQuery = ''
+  
   const files = store.files[id] || []
+  console.log(`[Store] category ${id} has ${files.length} files`)
+  
   if (files.length > 0) {
-    selectFile(files[0].id)
+    console.log(`[Store] Auto-selecting first file: ${files[0].id}`)
+    // 直接设置 currentFile，不要走复杂的 selectFile 逻辑，这样右边就能拿到这个文件了
+    // 如果是密码类别 (c2)，ContentPanel 会根据 !isGlobalUnlocked() 自己渲染锁屏遮罩
+    store.currentFile = files[0].id
+    store.mdEditMode = false
   } else {
+    console.log(`[Store] Category empty, clearing currentFile`)
     store.currentFile = null
   }
 }
 
 export function selectFile(id) {
+  console.log(`[Store] selectFile called with id: ${id}`)
   const file = findFile(id)
-  if (!file) return
-  if (file.locked) {
-    store.lockFileId = '__global__'
-    store.lockMode = 'unlock'
-    store.lockCallback = () => {
-      store.currentFile = id
-      store.mdEditMode = false
-    }
-    store.lockVisible = true
+  if (!file) {
+    console.log(`[Store] File not found`)
     return
   }
+
+  // 对于密码类别下的文件，如果未解锁则不能选中
+  const isC2 = isPasswordFile(id);
+
+  console.log(`[Store] File info: isC2=${isC2}, isGlobalUnlocked=${isGlobalUnlocked()}`)
+
+  // 如果是 C2 且未解锁，由于在 FilePanel 里面已经拦截弹窗了，
+  // 理论上这里其实不应该被拦截，但为了安全起见，这里还是放行并设置 currentFile。
+  // 因为如果拦住了，右侧面板就没有 currentFile，就会显示 empty state，而不是 locked state
+  
+  if (isC2 && isGlobalUnlocked()) {
+     console.log(`[Store] Global unlocked, refreshing lock timer`)
+     unlockGlobal()
+  }
+
+  console.log(`[Store] Setting currentFile to ${id}`)
   store.currentFile = id
   store.mdEditMode = false
 }
@@ -444,13 +482,14 @@ export function importFromJson(jsonStr, mode = 'merge') {
 // Trigger file download
 export async function downloadFile(content, filename, mimeType = 'text/plain') {
   // Tauri 环境：弹出保存对话框
-  if (typeof window !== 'undefined' && window.__TAURI__) {
+  if (typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
     try {
-      const { save } = window.__TAURI__.dialog
-      const { writeTextFile } = window.__TAURI__.fs
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+      const ext = filename.includes('.') ? filename.split('.').pop() : 'txt'
       const filePath = await save({
         defaultPath: filename,
-        filters: [{ name: 'All', extensions: [filename.split('.').pop() || 'txt'] }]
+        filters: [{ name: 'All', extensions: [ext] }]
       })
       if (filePath) {
         await writeTextFile(filePath, content)
@@ -459,10 +498,12 @@ export async function downloadFile(content, filename, mimeType = 'text/plain') {
       }
       return // 用户取消
     } catch (e) {
-      // Tauri API 不可用，fallback 到浏览器方式
+      console.error('[Tauri Export Error]', e)
+      // 如果 Tauri API 失败，就继续往下走，用浏览器方式下载
     }
   }
-  // 浏览器环境
+  
+  // 浏览器环境 / 或 Tauri API 调用失败的 Fallback
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -471,7 +512,8 @@ export async function downloadFile(content, filename, mimeType = 'text/plain') {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 100)
+  showToast('已下载到浏览器默认目录')
 }
 
 // Read file as text

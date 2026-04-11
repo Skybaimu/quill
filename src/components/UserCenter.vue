@@ -133,7 +133,9 @@ const stats = computed(() => {
   for (const catId in store.files) {
     const arr = store.files[catId] || []
     files += arr.length
-    locked += arr.filter(f => f.locked).length
+    if (catId === 'c2') {
+      locked += arr.length // 密码类别里的文件全都是加密的
+    }
   }
   return { categories: store.categories.length, files, locked }
 })
@@ -142,12 +144,31 @@ const hasGlobalPw = computed(() => hasGlobalPassword())
 const lockedCount = computed(() => stats.value.locked)
 
 function handleSetPassword() {
-  store.lockFileId = '__global__'
-  store.lockMode = 'setup'
-  store.lockCallback = () => {
-    showToast('全局密码设置成功')
+  if (hasGlobalPw.value) {
+    // 如果已经有密码，先验证旧密码
+    store.lockFileId = '__global__'
+    store.lockMode = 'unlock'
+    store.lockCallback = () => {
+      // 验证成功后，弹出设置新密码
+      setTimeout(() => {
+        store.lockFileId = '__global__'
+        store.lockMode = 'setup'
+        store.lockCallback = () => {
+          showToast('全局密码已成功更新')
+        }
+        store.lockVisible = true
+      }, 300)
+    }
+    store.lockVisible = true
+  } else {
+    // 第一次设置密码
+    store.lockFileId = '__global__'
+    store.lockMode = 'setup'
+    store.lockCallback = () => {
+      showToast('全局密码设置成功')
+    }
+    store.lockVisible = true
   }
-  store.lockVisible = true
 }
 
 function handleDeletePassword() {
@@ -210,6 +231,7 @@ watch(() => store.sidebarCollapsed, (v) => {
   flex-shrink: 0;
   border-top: 1px solid var(--border-light);
   position: relative;
+  width: 100%;
 }
 
 /* Avatar mini (collapsed) */

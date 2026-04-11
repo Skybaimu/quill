@@ -1,6 +1,7 @@
 <template>
   <aside class="sidebar" :class="{ collapsed: store.sidebarCollapsed }">
-    <div class="sidebar-header">
+    <div class="sidebar-main">
+      <div class="sidebar-header">
       <div class="logo" v-show="!store.sidebarCollapsed">
         <span class="logo-q">q</span>uill
       </div>
@@ -12,8 +13,14 @@
       <!-- 汉堡菜单下拉 -->
       <div class="hamburger-dropdown" v-if="showMenu" @click.stop>
         <label class="menu-item" @click="showMenu = false">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          打开本地文件
+          <input type="file" accept=".txt,.md" @change="doOpenFile" hidden />
+        </label>
+        <div class="ctx-divider"></div>
+        <label class="menu-item" @click="showMenu = false">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          导入数据
+          导入 JSON 备份
           <input type="file" accept=".json" @change="doImport" hidden />
         </label>
         <div class="menu-item" @click="doExportAll">
@@ -125,6 +132,10 @@
       </div>
     </div>
 
+      <!-- Drag over hint -->
+      <div class="drag-hint" v-if="dragOverId === 'sidebar'">放入侧栏</div>
+    </div>
+
     <!-- User center at bottom -->
     <UserCenter />
   </aside>
@@ -132,7 +143,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast } from '../stores/useStore.js'
+import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast } from '../stores/useStore.js'
 import UserCenter from './UserCenter.vue'
 
 const ICONS = {
@@ -228,6 +239,38 @@ async function doImport(e) {
   showMenu.value = false
 }
 
+async function doOpenFile(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  try {
+    const text = await readFileAsText(file)
+    const newFile = storeAddFile()
+    if (newFile) {
+      newFile.name = file.name.replace(/\.[^/.]+$/, "") // Remove extension
+      if (file.name.endsWith('.md')) {
+        newFile.type = 'markdown'
+        newFile.content = text
+      } else {
+        newFile.type = 'text'
+        newFile.blocks = [{
+          id: 'b' + Date.now(),
+          title: '导入内容',
+          collapsed: false,
+          starred: false,
+          order: 0,
+          items: [{ id: 'i' + Date.now(), label: '', text: text, type: 'text' }]
+        }]
+      }
+      selectFile(newFile.id)
+      showToast('已打开文件: ' + file.name)
+    }
+  } catch (err) {
+    showToast('读取文件失败')
+  }
+  e.target.value = ''
+  showMenu.value = false
+}
+
 // Drag & drop for categories
 function onCatDragStart(e, id) {
   dragCatId.value = id
@@ -275,12 +318,12 @@ function onDragEnd() {
   overflow: hidden;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.sidebar-main {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+}
 .sidebar-header {
-  display: flex;
-  align-items: center;
-  padding: 20px 16px 12px;
-  gap: 8px;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 16px 12px; flex-shrink: 0;
 }
 .logo {
   font-family: 'Cormorant Garamond', serif;
@@ -350,9 +393,7 @@ function onDragEnd() {
   width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
-  opacity: 0;
 }
-.cat-item:hover .cat-more { opacity: 1; }
 .cat-more:hover { background: var(--surface-hover); color: var(--text-primary); }
 
 .cat-input {

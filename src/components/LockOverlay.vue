@@ -2,7 +2,7 @@
   <div class="lock-overlay" :class="{ show: store.lockVisible }" @click.self="close">
     <!-- ===== 解锁模式 ===== -->
     <template v-if="store.lockMode === 'unlock' && !showForgot">
-      <div class="lock-title">安全验证</div>
+      <div class="lock-title" style="margin-top: 10px;">安全验证</div>
 
       <!-- 解锁方式标签 -->
       <div class="lock-tabs" v-if="hasPattern && hasPin">
@@ -109,7 +109,7 @@
       <div v-show="setupStep === 1">
         <div class="lock-title">设置数字密码</div>
         <div class="lock-subtitle">4 位数字，用于快速解锁</div>
-        <input type="password" class="setup-input" v-model="setupPin1" placeholder="输入 4 位数字" maxlength="4" inputmode="numeric" /><br/>
+        <input type="password" class="setup-input" ref="setupPin1Ref" v-model="setupPin1" placeholder="输入 4 位数字" maxlength="4" inputmode="numeric" /><br/>
         <input type="password" class="setup-input" v-model="setupPin2" placeholder="再次输入确认" maxlength="4" inputmode="numeric" /><br/>
         <div class="setup-step-actions">
           <button class="setup-next-btn" @click="goStep2">下一步</button>
@@ -182,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { store, showToast, hasGlobalPassword, getGlobalPasswordRecord, setGlobalPassword } from '../stores/useStore.js'
 import {
   createPasswordFileRecord, verifyPattern, verifyPin,
@@ -212,6 +212,7 @@ const forgotVerifying = ref(false)
 
 // --- 设置密码 ---
 const setupStep = ref(1)
+const setupPin1Ref = ref(null)
 const setupPin1 = ref('')
 const setupPin2 = ref('')
 const setupDots = ref([])
@@ -267,9 +268,7 @@ watch(() => store.lockVisible, async (v) => {
   if (!v) return
   // 重置所有状态
   unlockTab.value = 'pattern'
-  patternDots.value = []
-  patternHint.value = '连接至少 4 个点'
-  patternHintType.value = ''
+  resetPattern()
   pinValue.value = ''
   pinError.value = ''
   verifying.value = false
@@ -355,13 +354,19 @@ async function endPattern() {
   verifying.value = true
   patternHint.value = '验证中...'
   patternHintType.value = ''
+  console.log(`[LockOverlay] verifying pattern... target is ${store.lockFileId}`)
   const ok = await verifyPattern(p, currentRecord.value)
   verifying.value = false
   if (ok) {
+    console.log(`[LockOverlay] pattern matched! Calling callback...`)
     patternHint.value = '验证成功'
     patternHintType.value = 'success'
-    setTimeout(() => { close(); if (store.lockCallback) store.lockCallback() }, 300)
+    
+    // 不要等 setTimeout，立刻执行回调并关闭！
+    if (store.lockCallback) store.lockCallback()
+    close()
   } else {
+    console.log(`[LockOverlay] pattern incorrect.`)
     patternHint.value = '密码错误'
     patternHintType.value = 'error'
     if (patternWrapEl.value) patternWrapEl.value.style.animation = 'shake 0.4s'
@@ -389,14 +394,29 @@ function pinKey(k) {
   }
 }
 
+function handleGlobalKeydown(e) {
+  if (store.lockVisible && store.lockMode === 'unlock' && unlockTab.value === 'pin') {
+    if (/^[0-9]$/.test(e.key)) pinKey(e.key)
+    else if (e.key === 'Backspace') pinKey('⌫')
+  }
+}
+onMounted(() => document.addEventListener('keydown', handleGlobalKeydown))
+onUnmounted(() => document.removeEventListener('keydown', handleGlobalKeydown))
+
 async function verifyPinUnlock() {
+  if (verifying.value) return
   verifying.value = true
+  console.log(`[LockOverlay] verifying pin... target is ${store.lockFileId}`)
   const ok = await verifyPin(pinValue.value, currentRecord.value)
   verifying.value = false
   if (ok) {
-    close()
+    console.log(`[LockOverlay] pin matched! Calling callback...`)
+    
+    // 立刻执行回调并关闭！
     if (store.lockCallback) store.lockCallback()
+    close()
   } else {
+    console.log(`[LockOverlay] pin incorrect.`)
     pinError.value = '密码错误'
     setTimeout(() => { pinValue.value = ''; pinError.value = '' }, 500)
   }
@@ -446,6 +466,10 @@ function resetSetup() {
   setupSecurityQuestions.value = [{ question: '', answer: '' }]
   const canvas = setupPatternCanvas.value
   if (canvas) canvas.getContext('2d').clearRect(0, 0, 240, 240)
+  
+  if (store.lockVisible && store.lockMode === 'setup') {
+    import('vue').then(({ nextTick }) => nextTick(() => setupPin1Ref.value?.focus()))
+  }
 }
 
 function goStep2() {
@@ -584,8 +608,8 @@ async function finishSetup() {
   showToast('全局密码设置成功 (' + methods.join('+') + ')')
 }
 
-function close() {
-  store.lockVisible = false
+function close() { 
+  store.lockVisible = false 
   store.lockCallback = null
   store.lockFileId = null
   verifying.value = false
@@ -595,9 +619,11 @@ function close() {
 
 <style scoped>
 .lock-overlay {
-  position: fixed; inset: 0; background: rgba(250,249,247,0.96); backdrop-filter: blur(20px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  position: fixed; inset: 0; background: var(--bg);
+  z-index: 9999; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 .lock-overlay.show { opacity: 1; pointer-events: auto; }
 .lock-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 300; color: var(--text-primary); margin-bottom: 6px; }
@@ -619,10 +645,11 @@ function close() {
 .pattern-wrap { position: relative; width: 240px; height: 240px; margin-bottom: 20px; }
 .pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); height: 100%; align-content: space-evenly; justify-items: center; }
 .pattern-dot {
-  width: 20px; height: 20px; border-radius: 50%; background: var(--border);
+  width: 60px; height: 60px; padding: 20px; background-clip: content-box;
+  border-radius: 50%; background-color: var(--border);
   cursor: pointer; transition: all 0.15s;
 }
-.pattern-dot.active { background: var(--accent); transform: scale(1.3); box-shadow: 0 0 0 4px var(--accent-light); }
+.pattern-dot.active { background-color: var(--accent); transform: scale(1.3); }
 .pattern-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
 .pattern-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; min-height: 18px; text-align: center; }
 .pattern-hint.error { color: var(--danger); }

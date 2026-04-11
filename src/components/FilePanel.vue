@@ -59,12 +59,12 @@
         :key="file.id"
         class="file-item"
         :class="{
-          active: file.id === store.currentFile,
+          active: store.currentFile === file.id,
           starred: file.starred,
           'drag-over': dragOverId === file.id
         }"
         draggable="true"
-        @click="selectFile(file.id)"
+        @click="handleFileClick(file)"
         @contextmenu.prevent="openFileContext($event, file)"
         @dragstart="onFileDragStart($event, file.id)"
         @dragover.prevent="onFileDragOver($event, file.id)"
@@ -74,6 +74,12 @@
       >
         <div class="file-item-top">
           <div class="file-name">
+            <span v-if="store.currentCat === 'c2' && !isGlobalUnlocked()" class="file-star" style="margin-right: 2px;">
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            </span>
+            <span v-else-if="store.currentCat === 'c2' && isGlobalUnlocked()" class="file-star" style="margin-right: 2px;">
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+            </span>
             <span class="file-star" v-if="file.starred">★</span>
             <template v-if="editingFileId === file.id">
               <input
@@ -146,7 +152,8 @@ import {
   store, getSortedFiles, getPreview, selectFile,
   addFile as storeAddFile, getCurrentCat,
   highlightText, formatTime, showToast,
-  exportFileAsText, exportFileAsJson, downloadFile
+  exportFileAsText, exportFileAsJson, downloadFile,
+  isGlobalUnlocked
 } from '../stores/useStore.js'
 
 const scopes = [
@@ -230,6 +237,35 @@ function handleAddFile() {
   }
 }
 
+function handleFileClick(file) {
+  console.log(`[FilePanel] clicked file: ${file.name} (id: ${file.id}), currentCat: ${store.currentCat}`)
+  
+  if (store.currentCat === 'c2') {
+    // c2 是密码类别
+    if (!isGlobalUnlocked()) {
+      console.log(`[FilePanel] c2 clicked, but locked. Prompting unlock overlay.`)
+      // 不管解没解锁，都先设置 currentFile，这样右侧会显示锁定状态
+      store.currentFile = file.id
+      
+      store.lockFileId = '__global__'
+      store.lockMode = 'unlock'
+      store.lockCallback = () => {
+        import('../stores/useStore.js').then(({ unlockGlobal }) => {
+          console.log(`[FilePanel] unlockCallback executing`)
+          unlockGlobal()
+          // 不用再调用 selectFile，直接让 Vue 响应
+          store.currentFile = file.id
+        })
+      }
+      store.lockVisible = true
+      return
+    } else {
+      console.log(`[FilePanel] c2 clicked and already unlocked`)
+    }
+  }
+  selectFile(file.id)
+}
+
 function openFileContext(e, file) {
   e.preventDefault()
   store.ctxX = Math.min(e.clientX || e.pageX, window.innerWidth - 200)
@@ -278,7 +314,6 @@ function doExport(format) {
       break
     }
   }
-  showToast('已导出为 ' + format.toUpperCase())
 }
 
 // Drag & drop
@@ -410,9 +445,7 @@ defineExpose({ editingFileId })
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
-  opacity: 0;
 }
-.file-item:hover .file-export { opacity: 1; }
 .file-export:hover { background: var(--accent-light); color: var(--accent); }
 
 .file-more {

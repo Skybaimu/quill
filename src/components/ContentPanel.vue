@@ -22,41 +22,54 @@
         <div class="content-breadcrumb" v-else>选择文件</div>
       </div>
       <div class="content-actions" v-if="currentFile">
-        <button class="action-btn" v-if="currentFile.type === 'markdown'" @click="toggleMdEdit">
+        <button class="action-btn" v-if="isPwdFile && isGlobalUnlocked()" @click="lockNow" title="立即锁定">
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          锁定
+        </button>
+        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
           </svg>
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
-        <template v-if="currentFile.type !== 'markdown'">
+        <template v-if="currentFile.type !== 'markdown' && (!isPwdFile || isGlobalUnlocked())">
           <button class="action-btn" @click="doExpandAll" title="展开全部">展开全部</button>
           <button class="action-btn" @click="doCollapseAll" title="折叠全部">折叠全部</button>
         </template>
-        <button class="action-btn primary" @click="doCopyAll">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
+        <button class="action-btn primary" v-if="!isPwdFile || isGlobalUnlocked()" @click="doCopyAll">
           复制全部
         </button>
       </div>
     </div>
 
     <!-- Content body -->
-    <div class="content-body" ref="contentBodyRef">
-      <!-- Empty state -->
+      <div class="content-body" ref="contentBodyRef">
+        
+        <!-- Empty state -->
       <div class="empty-state" v-if="!currentFile">
         <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" opacity="0.15">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
-        <p>选择或创建一个文件</p>
+        <p v-if="store.currentCat === 'c2'">请选择左侧文件，或点击加号新建</p>
+        <p v-else>选择或创建一个文件</p>
         <p class="empty-hint">Ctrl+N 新建文件 · Ctrl+B 切换侧栏</p>
+      </div>
+
+      <!-- Locked state -->
+      <div class="locked-state" v-else-if="isPwdFile && !isGlobalUnlocked()">
+        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" opacity="0.15">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <p>此文件已加密，内容已隐藏</p>
+        <button class="action-btn primary" @click="promptUnlock" style="margin-top: 12px; font-size: 14px; padding: 8px 24px;">点击解锁</button>
       </div>
 
       <!-- Markdown file -->
       <template v-else-if="currentFile.type === 'markdown'">
         <div class="md-wrapper" :class="{ editing: store.mdEditMode }">
           <div class="md-preview-pane">
-            <div class="content-file-title">{{ currentFile.name }}</div>
             <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
           </div>
           <div
@@ -69,6 +82,7 @@
               class="md-source"
               :value="currentFile.content || ''"
               @input="onMdInput($event.target.value)"
+              @scroll="syncScroll"
               spellcheck="false"
             ></textarea>
           </div>
@@ -78,8 +92,6 @@
       <!-- Text file with blocks -->
       <template v-else>
         <div class="content-layout">
-          <div class="content-file-title">{{ currentFile.name }}</div>
-
           <div
             v-for="block in visibleBlocks"
             :key="block.id"
@@ -114,9 +126,6 @@
 
               <div class="block-actions">
                 <button class="block-copy-btn" @click.stop="copyBlock(block)" title="复制此内容块">
-                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                  </svg>
                   复制
                 </button>
                 <button class="block-btn" @click.stop="openBlockMenu($event, block)" title="更多操作">
@@ -202,8 +211,31 @@ import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import {
   store, findFile, getCurrentCat, addBlock as storeAddBlock, deleteBlock,
   addFile as storeAddFile, selectFile as storeSelectFile,
-  highlightText, blockMatchesQuery, formatTime, showToast
+  highlightText, blockMatchesQuery, formatTime, showToast,
+  isGlobalUnlocked, lockGlobal, unlockGlobal, isPasswordFile
 } from '../stores/useStore.js'
+
+function lockNow() {
+  lockGlobal()
+  showToast('已锁定')
+}
+
+function promptUnlock() {
+  console.log(`[ContentPanel] promptUnlock called`)
+  store.lockFileId = '__global__'
+  store.lockMode = 'unlock'
+  store.lockCallback = () => {
+    console.log(`[ContentPanel] unlockCallback executing`)
+    unlockGlobal()
+    // 强制触发一次更新
+    const cur = store.currentFile
+    store.currentFile = null
+    import('vue').then(({ nextTick }) => {
+      nextTick(() => { store.currentFile = cur })
+    })
+  }
+  store.lockVisible = true
+}
 
 const contentBodyRef = ref(null)
 const blockTextareaRef = ref(null)
@@ -212,8 +244,24 @@ const editingBlockId = ref(null)
 const renamingBlockId = ref(null)
 const mdEditFlex = ref(1)
 
-const currentFile = computed(() => findFile(store.currentFile))
-const currentCatName = computed(() => getCurrentCat()?.name || '')
+const currentFile = computed(() => {
+  return store.currentFile ? findFile(store.currentFile) : null
+})
+
+const currentCatName = computed(() => {
+  if (!currentFile.value) return ''
+  for (const catId in store.files) {
+    if (store.files[catId].some(f => f.id === currentFile.value.id)) {
+      const cat = store.categories.find(c => c.id === catId)
+      return cat ? cat.name : ''
+    }
+  }
+  return ''
+})
+
+const isPwdFile = computed(() => {
+  return currentFile.value ? isPasswordFile(currentFile.value.id) : false
+})
 const hasQuery = computed(() => store.searchQuery.trim().length > 0)
 
 const fileTime = computed(() => formatTime(currentFile.value?.updatedAt))
@@ -243,23 +291,44 @@ function hlText(text) {
   return highlightText(text.replace(/</g, '&lt;'), store.searchQuery.trim())
 }
 
+import { marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/atom-one-dark.css'
+import markedKatex from 'marked-katex-extension'
+import 'katex/dist/katex.min.css'
+import markedAlert from 'marked-alert'
+
+marked.use({
+  gfm: true,
+  breaks: true,
+  pedantic: false
+})
+
+marked.use(markedKatex({
+  throwOnError: false,
+  output: 'html'
+}))
+
+marked.use(markedAlert())
+
+marked.use(markedHighlight({
+  langPrefix: 'hljs language-',
+  emptyLangClass: 'hljs',
+  highlight(code, lang) {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext'
+    return hljs.highlight(code, { language }).value
+  }
+}))
+
 // Markdown rendering
 function renderMd(text) {
   if (!text) return '<p style="color:var(--text-muted)">暂无内容</p>'
-  let h = text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>')
-  return '<p>' + h + '</p>'
+  const rawHtml = marked.parse(text)
+  if (hasQuery.value) {
+    return highlightText(rawHtml, store.searchQuery.trim())
+  }
+  return rawHtml
 }
 
 function onMdInput(val) {
@@ -290,6 +359,20 @@ function startMdResize(e) {
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
+}
+
+function syncScroll(e) {
+  const source = e.target
+  const wrapper = source.closest('.md-wrapper')
+  if (!wrapper) return
+  const preview = wrapper.querySelector('.md-preview-pane')
+  if (!preview) return
+
+  // Calculate scroll percentage
+  const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight)
+  
+  // Apply to preview pane
+  preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight)
 }
 
 // Block operations
@@ -386,10 +469,19 @@ function openBlockMenu(e, block) {
 }
 
 function unlockApi(item) {
-  store.lockFileId = '__global__'
-  store.lockMode = 'unlock'
-  store.lockCallback = () => { item._locked = false }
-  store.lockVisible = true
+  import('../stores/useStore.js').then(({ isGlobalUnlocked, unlockGlobal }) => {
+    if (isGlobalUnlocked()) {
+      item._locked = false
+    } else {
+      store.lockFileId = '__global__'
+      store.lockMode = 'unlock'
+      store.lockCallback = () => { 
+        unlockGlobal()
+        item._locked = false 
+      }
+      store.lockVisible = true
+    }
+  })
 }
 
 // === Keyboard shortcuts ===
@@ -515,30 +607,24 @@ defineExpose({ renamingBlockId, editingBlockId })
 
 /* Content body */
 .content-body {
-  flex: 1; overflow-y: auto; padding: 32px 40px 120px;
+  flex: 1; overflow-y: auto; padding: 32px 40px 200px;
 }
-.content-layout { max-width: 1000px; }
-.content-file-title {
-  font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 300;
-  color: var(--accent); padding-bottom: 12px;
-  padding-left: 14px; border-left: 3px solid var(--accent);
-  position: sticky; top: 0; z-index: 11;
-  background: var(--surface);
-  padding-top: 10px; margin-bottom: 16px;
-}
+.content-layout { width: 100%; }
 
 /* Blocks */
 .content-block {
   margin-bottom: 20px;
   animation: fadeIn 0.2s ease;
 }
+.content-block:first-child { margin-top: 16px; }
 .block-header {
-  position: sticky; top: 72px; z-index: 10;
+  position: sticky; top: 0px; z-index: 10;
   display: flex; align-items: center; gap: 8px; padding: 10px 0 10px 14px;
   margin-bottom: 8px; border-left: 3px solid var(--accent);
   cursor: pointer; user-select: none;
   background: var(--surface);
   transition: box-shadow 0.2s;
+  box-shadow: 0 -32px 0 0 var(--surface);
 }
 .block-toggle {
   width: 18px; height: 18px;
@@ -675,13 +761,20 @@ defineExpose({ renamingBlockId, editingBlockId })
 /* Markdown */
 .md-wrapper {
   display: grid; grid-template-columns: 1fr; gap: 0;
-  max-width: 1000px;
+  width: 100%;
 }
 .md-wrapper.editing {
-  grid-template-columns: 1fr auto 1fr; gap: 0; max-width: 1400px;
+  grid-template-columns: 1fr auto 1fr; gap: 0; width: 100%;
+  height: 100%; min-height: 500px;
 }
-.md-preview-pane { min-width: 0; padding-right: 16px; }
-.md-edit-pane { min-width: 0; padding-left: 16px; }
+.md-preview-pane { 
+  min-width: 0; padding-right: 16px;
+  height: 100%; overflow-y: auto;
+}
+.md-edit-pane { 
+  min-width: 0; padding-left: 16px;
+  height: 100%;
+}
 
 /* Markdown resizer */
 .md-resizer {
@@ -694,45 +787,105 @@ defineExpose({ renamingBlockId, editingBlockId })
 }
 
 .md-source {
-  width: 100%; min-height: 500px; border: 1px solid var(--border);
+  width: 100%; height: 100%; min-height: 500px; border: 1px solid var(--border);
   border-radius: var(--radius); background: var(--bg);
   font-family: 'JetBrains Mono', monospace; font-size: 13px;
-  line-height: 1.7; color: var(--text-primary); resize: vertical;
-  outline: none; padding: 16px;
+  line-height: 1.7; color: var(--text-primary); resize: none;
+  outline: none; padding: 16px; overflow-y: auto;
 }
 .md-source:focus { border-color: var(--accent); }
 
 /* Markdown rendered */
-.md-content :deep(h1), .md-content :deep(h2), .md-content :deep(h3) {
+.md-content { padding-bottom: 40px; }
+.md-content :deep(h1), .md-content :deep(h2), .md-content :deep(h3),
+.md-content :deep(h4), .md-content :deep(h5), .md-content :deep(h6) {
   font-family: 'Cormorant Garamond', serif; font-weight: 500;
   color: var(--text-primary); margin: 1.5em 0 0.6em;
 }
-.md-content :deep(h1) { font-size: 24px; }
-.md-content :deep(h2) { font-size: 20px; }
-.md-content :deep(h3) { font-size: 17px; }
-.md-content :deep(p) { margin-bottom: 1em; line-height: 1.8; }
+.md-content :deep(h1) { font-size: 28px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px; }
+.md-content :deep(h2) { font-size: 22px; border-bottom: 1px solid var(--border-light); padding-bottom: 6px; }
+.md-content :deep(h3) { font-size: 18px; }
+.md-content :deep(p) { line-height: 1.8; margin-bottom: 1em; color: var(--text-secondary); }
+.md-content :deep(a) { color: var(--accent); text-decoration: none; }
+.md-content :deep(a:hover) { text-decoration: underline; }
+.md-content :deep(strong) { font-weight: 600; color: var(--text-primary); }
+.md-content :deep(em) { font-style: italic; }
 .md-content :deep(code) {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.9em;
-  background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--accent);
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;
+  color: var(--text-primary);
 }
 .md-content :deep(pre) {
-  background: #1a1814; border-radius: var(--radius);
-  padding: 16px; margin: 1em 0; overflow-x: auto;
+  margin: 1.2em 0;
+  border-radius: 8px;
+  overflow: hidden;
 }
-.md-content :deep(pre code) { background: none; padding: 0; color: #e8e5e0; font-size: 13px; }
-.md-content :deep(ul), .md-content :deep(ol) { padding-left: 1.5em; margin-bottom: 1em; }
+.md-content :deep(pre code) {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.md-content :deep(ul), .md-content :deep(ol) { padding-left: 1.5em; margin-bottom: 1em; color: var(--text-secondary); }
 .md-content :deep(li) { margin-bottom: 0.4em; line-height: 1.7; }
+.md-content :deep(li:has(> input[type="checkbox"])) { list-style: none; margin-left: -1.5em; display: flex; align-items: flex-start; }
+.md-content :deep(li > p) { margin-bottom: 0.2em; }
 .md-content :deep(blockquote) {
-  border-left: 3px solid var(--accent); padding-left: 16px;
+  border-left: 3px solid var(--accent);
   margin: 1em 0; color: var(--text-muted); font-style: italic;
+  background: var(--surface-hover); padding: 12px 16px; border-radius: 0 8px 8px 0;
+}
+.md-content :deep(.markdown-alert) {
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid var(--accent);
+  background-color: var(--surface-hover);
+  border-radius: 0 8px 8px 0;
+}
+.md-content :deep(.markdown-alert-title) {
+  display: flex;
+  font-weight: 600;
+  align-items: center;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.md-content :deep(.markdown-alert.markdown-alert-note) { border-left-color: #0969da; }
+.md-content :deep(.markdown-alert.markdown-alert-note .markdown-alert-title) { color: #0969da; }
+.md-content :deep(.markdown-alert.markdown-alert-tip) { border-left-color: #1a7f37; }
+.md-content :deep(.markdown-alert.markdown-alert-tip .markdown-alert-title) { color: #1a7f37; }
+.md-content :deep(.markdown-alert.markdown-alert-important) { border-left-color: #8250df; }
+.md-content :deep(.markdown-alert.markdown-alert-important .markdown-alert-title) { color: #8250df; }
+.md-content :deep(.markdown-alert.markdown-alert-warning) { border-left-color: #bf8700; }
+.md-content :deep(.markdown-alert.markdown-alert-warning .markdown-alert-title) { color: #bf8700; }
+.md-content :deep(.markdown-alert.markdown-alert-caution) { border-left-color: #cf222e; }
+.md-content :deep(.markdown-alert.markdown-alert-caution .markdown-alert-title) { color: #cf222e; }
+.md-content :deep(hr) {
+  border: 0; border-top: 1px solid var(--border-light); margin: 2em 0;
+}
+.md-content :deep(table) {
+  width: 100%; border-collapse: collapse; margin: 1.5em 0;
+  font-size: 14px;
+}
+.md-content :deep(th), .md-content :deep(td) {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.md-content :deep(th) {
+  background: var(--surface-hover); font-weight: 600; color: var(--text-primary);
+}
+.md-content :deep(tr:nth-child(even)) { background: var(--surface-hover); }
+.md-content :deep(img) {
+  max-width: 100%; height: auto; border-radius: 8px; margin: 1em 0;
+}
+.md-content :deep(input[type="checkbox"]) {
+  margin-right: 8px; margin-top: 4px; accent-color: var(--accent); cursor: pointer;
 }
 
-/* Empty state */
-.empty-state {
+/* Empty state & Locked state */
+.empty-state, .locked-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   height: 100%; min-height: 300px; color: var(--text-muted); text-align: center; gap: 14px;
 }
-.empty-state p { font-size: 14px; }
+.empty-state p, .locked-state p { font-size: 14px; }
 .empty-hint { font-size: 12px; opacity: 0.6; }
 
 /* Word count */
