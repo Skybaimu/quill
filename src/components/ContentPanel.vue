@@ -959,6 +959,7 @@ defineExpose({ renamingBlockId, editingBlockId })
 .md-wrapper {
   display: grid; grid-template-columns: 1fr; gap: 0;
   width: 100%;
+  position: relative;
 }
 .md-wrapper.editing {
   grid-template-columns: 1fr auto 1fr; gap: 0; width: 100%;
@@ -983,7 +984,7 @@ defineExpose({ renamingBlockId, editingBlockId })
 .md-toc-floating-btn {
   position: absolute;
   top: 16px;
-  left: -24px;
+  left: 16px;
   z-index: 20;
   background: var(--surface);
   border: 1px solid var(--border-light);
