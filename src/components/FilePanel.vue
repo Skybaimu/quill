@@ -153,7 +153,7 @@ import {
   addFile as storeAddFile, getCurrentCat,
   highlightText, formatTime, showToast,
   exportFileAsText, exportFileAsJson, downloadFile,
-  isGlobalUnlocked
+  isGlobalUnlocked, isPasswordFile, unlockGlobal
 } from '../stores/useStore.js'
 
 const scopes = [
