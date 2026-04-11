@@ -143,7 +143,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast } from '../stores/useStore.js'
+import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast, hasGlobalPassword, isGlobalUnlocked, unlockGlobal } from '../stores/useStore.js'
 import UserCenter from './UserCenter.vue'
 
 const ICONS = {
@@ -218,6 +218,20 @@ function jumpToStarred(item) {
 
 // Import/Export
 function doExportAll() {
+  if (hasGlobalPassword() && !isGlobalUnlocked()) {
+    store.lockFileId = '__global__'
+    store.lockMode = 'unlock'
+    store.lockCallback = () => {
+      unlockGlobal()
+      const json = exportAllAsJson()
+      downloadFile(json, 'quill-backup-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
+      showToast('已导出全部数据')
+      showMenu.value = false
+    }
+    store.lockVisible = true
+    return
+  }
+
   const json = exportAllAsJson()
   downloadFile(json, 'quill-backup-' + new Date().toISOString().slice(0, 10) + '.json', 'application/json')
   showToast('已导出全部数据')

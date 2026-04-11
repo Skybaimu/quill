@@ -283,6 +283,23 @@ function finishRename(file, e) {
 
 // Export
 function handleExport(e, file) {
+  if (isPasswordFile(file.id) && !isGlobalUnlocked()) {
+    store.lockFileId = '__global__'
+    store.lockMode = 'unlock'
+    store.lockCallback = () => {
+      unlockGlobal()
+      exportFile.value = file
+      const rect = e.target.closest('.file-export').getBoundingClientRect()
+      exportMenuStyle.value = {
+        left: Math.min(rect.left, window.innerWidth - 200) + 'px',
+        top: (rect.bottom + 4) + 'px'
+      }
+      exportMenuVisible.value = true
+    }
+    store.lockVisible = true
+    return
+  }
+
   exportFile.value = file
   const rect = e.target.closest('.file-export').getBoundingClientRect()
   exportMenuStyle.value = {
