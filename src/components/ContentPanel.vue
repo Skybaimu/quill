@@ -35,8 +35,9 @@
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
         <template v-if="currentFile.type !== 'markdown' && (!isPwdFile || isGlobalUnlocked())">
-          <button class="action-btn" @click="doExpandAll" title="展开全部">展开全部</button>
-          <button class="action-btn" @click="doCollapseAll" title="折叠全部">折叠全部</button>
+          <button class="action-btn" @click="toggleExpandCollapseAll" :title="isAllExpanded ? '折叠全部' : '展开全部'">
+            {{ isAllExpanded ? '折叠全部' : '展开全部' }}
+          </button>
         </template>
         <button class="action-btn primary" v-if="!isPwdFile || isGlobalUnlocked()" @click="doCopyAll">
           复制全部
@@ -277,6 +278,21 @@ const visibleBlocks = computed(() => {
   const q = store.searchQuery.trim()
   return sortedBlocks.value.filter(b => blockMatchesQuery(b, q))
 })
+
+const isAllExpanded = computed(() => {
+  if (!currentFile.value || currentFile.value.type === 'markdown') return false
+  const blocks = visibleBlocks.value
+  if (!blocks || blocks.length === 0) return true
+  return blocks.every(b => !b.collapsed)
+})
+
+function toggleExpandCollapseAll() {
+  if (isAllExpanded.value) {
+    doCollapseAll()
+  } else {
+    doExpandAll()
+  }
+}
 
 const wordCount = computed(() => {
   if (!currentFile.value) return 0
