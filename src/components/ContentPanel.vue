@@ -70,15 +70,26 @@
       <!-- Markdown file -->
       <template v-else-if="currentFile.type === 'markdown'">
         <div class="md-wrapper" :class="{ editing: store.mdEditMode, 'has-toc': mdToc.length > 0 && !store.mdTocCollapsed }">
-          <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode" :class="{ collapsed: store.mdTocCollapsed }">
+          
+          <!-- Floating TOC toggle button when collapsed -->
+          <button 
+            v-if="mdToc.length > 0 && !store.mdEditMode && store.mdTocCollapsed" 
+            class="md-toc-floating-btn" 
+            @click="store.mdTocCollapsed = false" 
+            title="展开大纲"
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+          </button>
+
+          <!-- Main TOC Pane -->
+          <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode && !store.mdTocCollapsed">
             <div class="md-toc-header">
-              <div class="md-toc-title" v-if="!store.mdTocCollapsed">大纲</div>
-              <button class="md-toc-toggle" @click="store.mdTocCollapsed = !store.mdTocCollapsed" :title="store.mdTocCollapsed ? '展开大纲' : '收起大纲'">
-                <svg v-if="!store.mdTocCollapsed" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-                <svg v-else width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+              <div class="md-toc-title">大纲</div>
+              <button class="md-toc-toggle" @click="store.mdTocCollapsed = true" title="收起大纲">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
               </button>
             </div>
-            <ul class="md-toc-list" v-show="!store.mdTocCollapsed">
+            <ul class="md-toc-list">
               <li v-for="item in mdToc" :key="item.id" :style="{ paddingLeft: (item.level - 1) * 12 + 'px' }">
                 <a :href="'#' + item.id" @click.prevent="scrollToHeading(item.id)">{{ item.text }}</a>
               </li>
@@ -964,29 +975,32 @@ defineExpose({ renamingBlockId, editingBlockId })
   margin-right: 16px;
   background: var(--surface);
   display: flex; flex-direction: column;
-  position: sticky; top: 0; height: 100vh;
-  max-height: 100vh;
+  position: sticky; top: 0; height: calc(100vh - 120px);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
-.md-toc-pane.collapsed {
-  width: 48px;
-  border-right: 1px solid var(--border-light);
+
+.md-toc-floating-btn {
+  position: absolute;
+  top: 16px;
+  left: -24px;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  transition: all 0.2s;
 }
-.md-wrapper.has-toc:not(.editing) .md-toc-pane.collapsed + .md-preview-pane {
-  grid-column: 1 / 3;
-  margin-left: 48px;
-}
-.md-wrapper.has-toc:not(.editing):has(.md-toc-pane.collapsed) {
-  grid-template-columns: 0px 1fr;
+.md-toc-floating-btn:hover {
+  background: var(--surface-hover); color: var(--accent);
 }
 
 .md-toc-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px; flex-shrink: 0;
-}
-.md-toc-pane.collapsed .md-toc-header {
-  justify-content: center; padding: 16px 0;
 }
 .md-toc-title {
   font-size: 12px;
