@@ -45,6 +45,16 @@
         "mimeType": "text/plain",
         "description": "纯文本文档"
       }
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "template": null,
+        "installMode": "both",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false,
+        "installerHooks": "nsis/install-hooks.nsh"
+      },
+      "wix": null
+    }
   }
 }
