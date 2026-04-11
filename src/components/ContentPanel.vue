@@ -380,7 +380,12 @@ function renderMd(text) {
       toc.push({ level: token.depth, text: headingText, id })
     }
   })
-  mdToc.value = toc
+  
+  // Prevent recursive update loop by only updating if changed
+  const tocStr = JSON.stringify(toc)
+  if (JSON.stringify(mdToc.value) !== tocStr) {
+    mdToc.value = toc
+  }
 
   const rawHtml = marked.parser(tokens)
   if (hasQuery.value) {
@@ -834,6 +839,7 @@ defineExpose({ renamingBlockId, editingBlockId })
 }
 .md-wrapper.has-toc:not(.editing) {
   grid-template-columns: 200px 1fr;
+  align-items: start;
 }
 
 .md-toc-pane {
@@ -842,7 +848,8 @@ defineExpose({ renamingBlockId, editingBlockId })
   margin-right: 16px;
   background: var(--surface);
   display: flex; flex-direction: column;
-  position: sticky; top: 0; height: 100%;
+  position: sticky; top: 0; height: 100vh;
+  max-height: 100vh;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
