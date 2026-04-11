@@ -69,10 +69,16 @@
 
       <!-- Markdown file -->
       <template v-else-if="currentFile.type === 'markdown'">
-        <div class="md-wrapper" :class="{ editing: store.mdEditMode, 'has-toc': mdToc.length > 0 }">
-          <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode">
-            <div class="md-toc-title">大纲</div>
-            <ul class="md-toc-list">
+        <div class="md-wrapper" :class="{ editing: store.mdEditMode, 'has-toc': mdToc.length > 0 && !store.mdTocCollapsed }">
+          <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode" :class="{ collapsed: store.mdTocCollapsed }">
+            <div class="md-toc-header">
+              <div class="md-toc-title" v-if="!store.mdTocCollapsed">大纲</div>
+              <button class="md-toc-toggle" @click="store.mdTocCollapsed = !store.mdTocCollapsed" :title="store.mdTocCollapsed ? '展开大纲' : '收起大纲'">
+                <svg v-if="!store.mdTocCollapsed" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+                <svg v-else width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+            <ul class="md-toc-list" v-show="!store.mdTocCollapsed">
               <li v-for="item in mdToc" :key="item.id" :style="{ paddingLeft: (item.level - 1) * 12 + 'px' }">
                 <a :href="'#' + item.id" @click.prevent="scrollToHeading(item.id)">{{ item.text }}</a>
               </li>
@@ -832,10 +838,32 @@ defineExpose({ renamingBlockId, editingBlockId })
 
 .md-toc-pane {
   border-right: 1px solid var(--border-light);
-  padding: 0 16px 0 0;
+  padding: 0;
   margin-right: 16px;
-  overflow-y: auto;
   background: var(--surface);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.md-toc-pane.collapsed {
+  width: 48px;
+  border-right: 1px solid var(--border-light);
+}
+.md-wrapper.has-toc:not(.editing) .md-toc-pane.collapsed + .md-preview-pane {
+  grid-column: 1 / 3;
+  margin-left: 48px;
+}
+.md-wrapper.has-toc:not(.editing):has(.md-toc-pane.collapsed) {
+  grid-template-columns: 0px 1fr;
+}
+
+.md-toc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px; flex-shrink: 0;
+}
+.md-toc-pane.collapsed .md-toc-header {
+  justify-content: center; padding: 16px 0;
 }
 .md-toc-title {
   font-size: 12px;
@@ -843,12 +871,22 @@ defineExpose({ renamingBlockId, editingBlockId })
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 16px;
 }
+.md-toc-toggle {
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 4px; transition: all 0.2s;
+}
+.md-toc-toggle:hover {
+  background: var(--surface-hover); color: var(--text-primary);
+}
+
 .md-toc-list {
   list-style: none;
-  padding: 0;
+  padding: 0 16px 24px 16px;
   margin: 0;
+  overflow-y: auto;
+  flex: 1;
 }
 .md-toc-list li {
   margin-bottom: 8px;

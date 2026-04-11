@@ -92,6 +92,7 @@ const store = reactive({
   searchScope: 'file',
   searchQuery: '',
   mdEditMode: false,
+  mdTocCollapsed: false,
   // Context menu state
   ctxVisible: false,
   ctxX: 0,
