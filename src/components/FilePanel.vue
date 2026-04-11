@@ -110,7 +110,7 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue'
 import {
-  store, getSortedFiles, getPreview, selectFile as storeSelectFile,
+  store, getSortedFiles, getPreview, selectFile,
   addFile as storeAddFile, getCurrentCat,
   highlightText, formatTime, showToast
 } from '../stores/useStore.js'
@@ -176,15 +176,16 @@ function getFileItemCount(file) {
 
 function handleAddFile() {
   const file = storeAddFile()
-  if (!file) return
-  nextTick(() => {
-    storeSelectFile(file.id)
+  if (file) {
+    editingFileId.value = file.id
     nextTick(() => {
-      // Auto-focus on the content textarea of the first block
-      const display = document.querySelector('.block-text-display')
-      if (display) display.click()
+      selectFile(file.id)
+      nextTick(() => {
+        const input = document.querySelector('.file-name-input')
+        if (input) { input.focus(); input.select() }
+      })
     })
-  })
+  }
 }
 
 function openFileContext(e, file) {
@@ -325,11 +326,11 @@ defineExpose({ editingFileId })
 .file-star { color: var(--accent); font-size: 12px; margin-right: 4px; }
 
 .file-more {
-  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-  border: none; background: transparent; cursor: pointer; color: var(--text-muted);
-  border-radius: 4px; opacity: 0; transition: all 0.15s; flex-shrink: 0;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
 }
-.file-item:hover .file-more { opacity: 1; }
 .file-more:hover { background: var(--surface-hover); color: var(--text-primary); }
 
 .file-preview {

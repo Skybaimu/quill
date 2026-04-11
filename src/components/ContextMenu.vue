@@ -135,10 +135,8 @@ function doAction(act) {
         }
         break
       case 'delete':
-        if (confirm(`确定删除「${file.name}」？`)) {
-          deleteFile(target)
-          showToast('已删除')
-        }
+        deleteFile(target)
+        showToast('已删除')
         break
     }
   } else if (store.ctxType === 'category') {

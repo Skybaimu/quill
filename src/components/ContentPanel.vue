@@ -550,9 +550,8 @@ defineExpose({ renamingBlockId, editingBlockId })
   color: var(--text-primary); outline: none; padding: 2px 6px; border-radius: 4px;
 }
 .block-actions {
-  display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s;
+  display: flex; gap: 2px; transition: opacity 0.15s;
 }
-.block-header:hover .block-actions { opacity: 1; }
 
 .block-btn {
   width: 26px; height: 26px;
