@@ -75,6 +75,15 @@
         </div>
 
         <div class="uc-section">
+          <div class="uc-section-title">数据</div>
+          <button class="uc-pw-btn uc-reset-btn" @click="handleReset">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            恢复默认数据
+          </button>
+          <div class="uc-pw-hint">将清除所有数据并恢复为初始状态</div>
+        </div>
+
+        <div class="uc-section">
           <div class="uc-section-title">快捷键</div>
           <div class="uc-shortcuts">
             <div class="uc-shortcut"><span class="sc-key">Ctrl+N</span><span>新建文件</span></div>
@@ -156,6 +165,14 @@ function handleDeletePassword() {
     showToast('已删除全局密码，所有文件已解锁')
   }
   store.lockVisible = true
+}
+
+function handleReset() {
+  if (!confirm('确定要恢复默认数据吗？\n所有分类、文件和密码将被清除，无法恢复。')) return
+  localStorage.removeItem('quill-data')
+  localStorage.removeItem('quill-username')
+  localStorage.removeItem('quill-fontsize')
+  location.reload()
 }
 
 const fileStats = computed(() => {
@@ -312,4 +329,8 @@ watch(() => store.sidebarCollapsed, (v) => {
 }
 .uc-pw-btn:hover { border-color: var(--accent); color: var(--accent); }
 .uc-pw-hint { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+
+/* Reset */
+.uc-reset-btn { border-color: var(--danger); color: var(--danger); }
+.uc-reset-btn:hover { background: var(--danger-light); }
 </style>
