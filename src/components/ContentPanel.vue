@@ -85,7 +85,7 @@
             </ul>
           </div>
           <div class="md-preview-pane">
-            <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
+            <div class="md-content" v-html="renderMd(currentFile.content || '')" @scroll="syncScroll('preview', $event)"></div>
           </div>
           <div
             class="md-resizer"
@@ -97,7 +97,9 @@
               class="md-source"
               :value="currentFile.content || ''"
               @input="onMdInput($event.target.value)"
-              @scroll="syncScroll"
+              @scroll="syncScroll('source', $event)"
+              @click="syncCursorToPreview($event)"
+              @keyup="syncCursorToPreview($event)"
               spellcheck="false"
             ></textarea>
           </div>
@@ -353,13 +355,25 @@ marked.use(markedHighlight({
 
 // Markdown rendering
 const mdToc = ref([])
+const lineMap = ref([])
 
 const renderer = new marked.Renderer()
 renderer.heading = function({ tokens, depth }) {
   const text = this.parser.parseInline(tokens)
-  // Generate a safe ID for the heading
   const id = 'heading-' + text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-  return `<h${depth} id="${id}">${text}</h${depth}>`
+  return `<h${depth} id="${id}" data-line="${this._currentLine || 0}">${text}</h${depth}>`
+}
+renderer.paragraph = function({ tokens }) {
+  return `<p data-line="${this._currentLine || 0}">${this.parser.parseInline(tokens)}</p>\n`
+}
+renderer.list = function(token) {
+  const body = token.items.map(item => this.listitem(item)).join('')
+  const type = token.ordered ? 'ol' : 'ul'
+  const start = token.ordered && token.start !== 1 ? ` start="${token.start}"` : ''
+  return `<${type}${start} data-line="${this._currentLine || 0}">\n${body}</${type}>\n`
+}
+renderer.code = function({ text, lang }) {
+  return `<pre data-line="${this._currentLine || 0}"><code>${text}</code></pre>\n`
 }
 
 marked.use({ renderer })
@@ -367,27 +381,59 @@ marked.use({ renderer })
 function renderMd(text) {
   if (!text) {
     mdToc.value = []
+    lineMap.value = []
     return '<p style="color:var(--text-muted)">暂无内容</p>'
   }
   
-  // Extract TOC
+  // Add line numbers to tokens for cursor mapping
   const tokens = marked.lexer(text)
+  const lines = text.split('\n')
+  let currentLine = 0
+  
+  // Custom lexer traversal to attach line numbers to tokens
+  function attachLines(tokens) {
+    for (const token of tokens) {
+      if (token.raw) {
+        // Find the line where this token starts
+        // This is a simplified approach, a true AST mapper would be more complex
+        token._line = currentLine
+        const newlines = (token.raw.match(/\n/g) || []).length
+        currentLine += newlines
+      }
+      if (token.tokens) attachLines(token.tokens)
+      if (token.items) attachLines(token.items)
+    }
+  }
+  attachLines(tokens)
+  
   const toc = []
+  const map = []
   tokens.forEach(token => {
     if (token.type === 'heading' && token.depth <= 3) {
       const headingText = token.text
       const id = 'heading-' + headingText.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
       toc.push({ level: token.depth, text: headingText, id })
     }
+    if (token._line !== undefined) {
+      map.push({ line: token._line, type: token.type })
+    }
   })
   
-  // Prevent recursive update loop by only updating if changed
   const tocStr = JSON.stringify(toc)
   if (JSON.stringify(mdToc.value) !== tocStr) {
     mdToc.value = toc
   }
+  lineMap.value = map
 
-  const rawHtml = marked.parser(tokens)
+  // Hack parser to use our line numbers
+  const parser = new marked.Parser()
+  const originalParse = parser.parse.bind(parser)
+  parser.parse = function(tokens) {
+    this.renderer._currentLine = tokens[0]?._line
+    return originalParse(tokens)
+  }
+
+  const rawHtml = marked.parser(tokens, { renderer })
   if (hasQuery.value) {
     return highlightText(rawHtml, store.searchQuery.trim())
   }
@@ -431,18 +477,72 @@ function startMdResize(e) {
   document.addEventListener('mouseup', onUp)
 }
 
-function syncScroll(e) {
+let isSyncingLeft = false
+let isSyncingRight = false
+let syncTimeout = null
+
+function syncScroll(sourceType, e) {
   const source = e.target
   const wrapper = source.closest('.md-wrapper')
   if (!wrapper) return
-  const preview = wrapper.querySelector('.md-preview-pane')
-  if (!preview) return
-
-  // Calculate scroll percentage
-  const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight)
   
-  // Apply to preview pane
-  preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight)
+  if (sourceType === 'source') {
+    if (isSyncingRight) return
+    isSyncingLeft = true
+    const preview = wrapper.querySelector('.md-preview-pane')
+    if (preview) {
+      const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight)
+      preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight)
+    }
+  } else {
+    if (isSyncingLeft) return
+    isSyncingRight = true
+    const sourcePane = wrapper.querySelector('.md-source')
+    if (sourcePane) {
+      const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight)
+      sourcePane.scrollTop = percentage * (sourcePane.scrollHeight - sourcePane.clientHeight)
+    }
+  }
+
+  clearTimeout(syncTimeout)
+  syncTimeout = setTimeout(() => {
+    isSyncingLeft = false
+    isSyncingRight = false
+  }, 50)
+}
+
+function syncCursorToPreview(e) {
+  const textarea = e.target
+  const content = textarea.value
+  const cursorIndex = textarea.selectionStart
+  
+  // Calculate current line number based on cursor index
+  const textBeforeCursor = content.substring(0, cursorIndex)
+  const currentLine = (textBeforeCursor.match(/\n/g) || []).length
+
+  // Find the closest DOM element with this line number
+  const preview = textarea.closest('.md-wrapper')?.querySelector('.md-preview-pane')
+  if (!preview) return
+  
+  const elements = preview.querySelectorAll('[data-line]')
+  let closestEl = null
+  let minDiff = Infinity
+  
+  elements.forEach(el => {
+    const line = parseInt(el.getAttribute('data-line') || 0)
+    const diff = currentLine - line
+    if (diff >= 0 && diff < minDiff) {
+      minDiff = diff
+      closestEl = el
+    }
+  })
+  
+  if (closestEl && minDiff < 10) {
+    // Only smooth scroll if we're not actively dragging the scrollbar
+    if (!isSyncingLeft && !isSyncingRight) {
+      closestEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
 }
 
 // Block operations
