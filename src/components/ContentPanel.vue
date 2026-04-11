@@ -69,7 +69,15 @@
 
       <!-- Markdown file -->
       <template v-else-if="currentFile.type === 'markdown'">
-        <div class="md-wrapper" :class="{ editing: store.mdEditMode }">
+        <div class="md-wrapper" :class="{ editing: store.mdEditMode, 'has-toc': mdToc.length > 0 }">
+          <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode">
+            <div class="md-toc-title">大纲</div>
+            <ul class="md-toc-list">
+              <li v-for="item in mdToc" :key="item.id" :style="{ paddingLeft: (item.level - 1) * 12 + 'px' }">
+                <a :href="'#' + item.id" @click.prevent="scrollToHeading(item.id)">{{ item.text }}</a>
+              </li>
+            </ul>
+          </div>
           <div class="md-preview-pane">
             <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
           </div>
@@ -338,13 +346,48 @@ marked.use(markedHighlight({
 }))
 
 // Markdown rendering
+const mdToc = ref([])
+
+const renderer = new marked.Renderer()
+renderer.heading = function({ tokens, depth }) {
+  const text = this.parser.parseInline(tokens)
+  // Generate a safe ID for the heading
+  const id = 'heading-' + text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+  return `<h${depth} id="${id}">${text}</h${depth}>`
+}
+
+marked.use({ renderer })
+
 function renderMd(text) {
-  if (!text) return '<p style="color:var(--text-muted)">暂无内容</p>'
-  const rawHtml = marked.parse(text)
+  if (!text) {
+    mdToc.value = []
+    return '<p style="color:var(--text-muted)">暂无内容</p>'
+  }
+  
+  // Extract TOC
+  const tokens = marked.lexer(text)
+  const toc = []
+  tokens.forEach(token => {
+    if (token.type === 'heading' && token.depth <= 3) {
+      const headingText = token.text
+      const id = 'heading-' + headingText.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+      toc.push({ level: token.depth, text: headingText, id })
+    }
+  })
+  mdToc.value = toc
+
+  const rawHtml = marked.parser(tokens)
   if (hasQuery.value) {
     return highlightText(rawHtml, store.searchQuery.trim())
   }
   return rawHtml
+}
+
+function scrollToHeading(id) {
+  const el = document.getElementById(id)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 function onMdInput(val) {
@@ -782,6 +825,47 @@ defineExpose({ renamingBlockId, editingBlockId })
 .md-wrapper.editing {
   grid-template-columns: 1fr auto 1fr; gap: 0; width: 100%;
   height: 100%; min-height: 500px;
+}
+.md-wrapper.has-toc:not(.editing) {
+  grid-template-columns: 200px 1fr;
+}
+
+.md-toc-pane {
+  border-right: 1px solid var(--border-light);
+  padding: 0 16px 0 0;
+  margin-right: 16px;
+  overflow-y: auto;
+  background: var(--surface);
+}
+.md-toc-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+.md-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.md-toc-list li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.md-toc-list a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.2s;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-toc-list a:hover {
+  color: var(--accent);
 }
 .md-preview-pane { 
   min-width: 0; padding-right: 16px;

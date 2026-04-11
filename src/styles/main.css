@@ -39,6 +39,55 @@
   --radius-lg: 12px;
 }
 
+/* Dark Theme */
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --surface: #252526;
+  --surface-hover: #2d2d30;
+  --surface-active: #3e3e42;
+  --border: #3e3e42;
+  --border-light: #333333;
+  --text-primary: #d4d4d4;
+  --text-secondary: #9cdcfe;
+  --text-muted: #808080;
+  --accent: #c45d3a;
+  --accent-light: #3e2621;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
+}
+
+/* Eye Care Green Theme */
+:root[data-theme="eye-care"] {
+  --bg: #cce8cf;
+  --surface: #e3f2e4;
+  --surface-hover: #b5d6b8;
+  --surface-active: #a1c7a5;
+  --border: #a1c7a5;
+  --border-light: #b5d6b8;
+  --text-primary: #2d4c31;
+  --text-secondary: #4a7551;
+  --text-muted: #6b9e73;
+  --accent: #4a8c6f;
+  --accent-light: #d6ebd9;
+}
+
+/* Sakura Pink Theme */
+:root[data-theme="sakura"] {
+  --bg: #fdf6f5;
+  --surface: #fff0f5;
+  --surface-hover: #fbe0e9;
+  --surface-active: #f9d0dd;
+  --border: #f9d0dd;
+  --border-light: #fbe0e9;
+  --text-primary: #5c3a45;
+  --text-secondary: #8c5a6b;
+  --text-muted: #b58394;
+  --accent: #e57399;
+  --accent-light: #fbe0e9;
+}
+
 * {
   margin: 0;
   padding: 0;

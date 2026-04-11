@@ -47,13 +47,23 @@
         </div>
 
         <div class="uc-section">
-          <div class="uc-section-title">外观</div>
+          <div class="uc-section-title">外观设置</div>
           <div class="uc-field">
             <label>字体大小</label>
-            <div class="uc-font-size">
-              <button class="fs-btn" :class="{ active: fontSize === 'small' }" @click="setFontSize('small')">小</button>
-              <button class="fs-btn" :class="{ active: fontSize === 'medium' }" @click="setFontSize('medium')">中</button>
-              <button class="fs-btn" :class="{ active: fontSize === 'large' }" @click="setFontSize('large')">大</button>
+            <div class="uc-btn-group">
+              <button class="uc-toggle-btn" :class="{ active: fontSize === 'xsmall' }" @click="setFontSize('xsmall')">极小</button>
+              <button class="uc-toggle-btn" :class="{ active: fontSize === 'small' }" @click="setFontSize('small')">小</button>
+              <button class="uc-toggle-btn" :class="{ active: fontSize === 'medium' }" @click="setFontSize('medium')">中</button>
+              <button class="uc-toggle-btn" :class="{ active: fontSize === 'large' }" @click="setFontSize('large')">大</button>
+            </div>
+          </div>
+          <div class="uc-field" style="margin-top: 12px;">
+            <label>主题模式</label>
+            <div class="uc-btn-group">
+              <button class="uc-toggle-btn" :class="{ active: theme === 'light' }" @click="setTheme('light')">默认</button>
+              <button class="uc-toggle-btn" :class="{ active: theme === 'dark' }" @click="setTheme('dark')">夜间</button>
+              <button class="uc-toggle-btn" :class="{ active: theme === 'eye-care' }" @click="setTheme('eye-care')">护眼</button>
+              <button class="uc-toggle-btn" :class="{ active: theme === 'sakura' }" @click="setTheme('sakura')">樱花</button>
             </div>
           </div>
         </div>
@@ -116,6 +126,7 @@ const showPanel = ref(false)
 
 const userName = ref(localStorage.getItem('quill-username') || '')
 const fontSize = ref(localStorage.getItem('quill-fontsize') || 'medium')
+const theme = ref(localStorage.getItem('quill-theme') || 'light')
 
 const initials = computed(() => {
   if (!userName.value) return '?'
@@ -209,15 +220,27 @@ function setFontSize(size) {
   localStorage.setItem('quill-fontsize', size)
   const root = document.documentElement
   switch (size) {
-    case 'small': root.style.setProperty('--app-font-size', '12px'); break
-    case 'medium': root.style.setProperty('--app-font-size', '14px'); break
-    case 'large': root.style.setProperty('--app-font-size', '16px'); break
+    case 'xsmall': root.style.setProperty('--app-font-size', '11px'); break
+    case 'small': root.style.setProperty('--app-font-size', '13px'); break
+    case 'medium': root.style.setProperty('--app-font-size', '15px'); break
+    case 'large': root.style.setProperty('--app-font-size', '17px'); break
   }
 }
 
-// Initialize font size on mount
+function setTheme(mode) {
+  theme.value = mode
+  localStorage.setItem('quill-theme', mode)
+  if (mode === 'light') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', mode)
+  }
+}
+
+// Initialize on mount
 watch(() => true, () => {
   setFontSize(fontSize.value)
+  setTheme(theme.value)
 }, { immediate: true })
 
 // Close panel when sidebar collapses
@@ -299,19 +322,27 @@ watch(() => store.sidebarCollapsed, (v) => {
   display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;
 }
 .uc-input {
-  width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
-  font-family: inherit; font-size: 13px; background: var(--surface); color: var(--text-primary);
+  width: 100%; background: var(--surface-hover); border: 1px solid transparent;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary);
+  outline: none; transition: border-color 0.2s; font-family: inherit;
 }
-.uc-input:focus { outline: none; border-color: var(--accent); }
+.uc-input:focus { border-color: var(--accent); }
 
-.uc-font-size { display: flex; gap: 4px; }
-.fs-btn {
-  flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface); cursor: pointer; font-family: inherit;
-  font-size: 12px; color: var(--text-muted); transition: all 0.15s;
+/* Toggle Button Group */
+.uc-btn-group {
+  display: flex; background: var(--surface-hover); border-radius: 6px;
+  padding: 2px;
 }
-.fs-btn.active { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
-.fs-btn:hover:not(.active) { border-color: var(--text-muted); }
+.uc-toggle-btn {
+  flex: 1; border: none; background: transparent; padding: 4px 0;
+  font-size: 11px; color: var(--text-secondary); border-radius: 4px;
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.uc-toggle-btn.active {
+  background: var(--surface); color: var(--text-primary);
+  box-shadow: var(--shadow-sm); font-weight: 500;
+}
+.uc-toggle-btn:not(.active):hover { color: var(--text-primary); }
 
 /* Stats */
 .uc-stats { display: flex; gap: 12px; }
