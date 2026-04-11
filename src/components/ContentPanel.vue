@@ -358,22 +358,27 @@ const mdToc = ref([])
 const lineMap = ref([])
 
 const renderer = new marked.Renderer()
-renderer.heading = function({ tokens, depth }) {
-  const text = this.parser.parseInline(tokens)
-  const id = 'heading-' + text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-  return `<h${depth} id="${id}" data-line="${this._currentLine || 0}">${text}</h${depth}>`
+// Helper to extract the token line number before rendering
+function getLine(token) {
+  return token && token._line !== undefined ? token._line : 0;
 }
-renderer.paragraph = function({ tokens }) {
-  return `<p data-line="${this._currentLine || 0}">${this.parser.parseInline(tokens)}</p>\n`
+
+renderer.heading = function(token) {
+  const text = this.parser.parseInline(token.tokens)
+  const id = 'heading-' + text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+  return `<h${token.depth} id="${id}" data-line="${getLine(token)}">${text}</h${token.depth}>`
+}
+renderer.paragraph = function(token) {
+  return `<p data-line="${getLine(token)}">${this.parser.parseInline(token.tokens)}</p>\n`
 }
 renderer.list = function(token) {
   const body = token.items.map(item => this.listitem(item)).join('')
   const type = token.ordered ? 'ol' : 'ul'
   const start = token.ordered && token.start !== 1 ? ` start="${token.start}"` : ''
-  return `<${type}${start} data-line="${this._currentLine || 0}">\n${body}</${type}>\n`
+  return `<${type}${start} data-line="${getLine(token)}">\n${body}</${type}>\n`
 }
-renderer.code = function({ text, lang }) {
-  return `<pre data-line="${this._currentLine || 0}"><code>${text}</code></pre>\n`
+renderer.code = function(token) {
+  return `<pre data-line="${getLine(token)}"><code>${token.text}</code></pre>\n`
 }
 
 marked.use({ renderer })
@@ -425,16 +430,7 @@ function renderMd(text) {
   }
   lineMap.value = map
 
-  // Hack parser to use our line numbers
-  const parser = new marked.Parser()
-  const originalParse = parser.parse.bind(parser)
-  parser.parse = function(tokens) {
-    if (tokens && tokens[0]) {
-      this.renderer._currentLine = tokens[0]._line
-    }
-    return originalParse(tokens)
-  }
-
+  // Hack parser is no longer needed since we read directly from tokens in the renderer
   const rawHtml = marked.parser(tokens, { renderer })
   if (hasQuery.value) {
     return highlightText(rawHtml, store.searchQuery.trim())
@@ -1034,11 +1030,11 @@ defineExpose({ renamingBlockId, editingBlockId })
 }
 .md-preview-pane { 
   min-width: 0; padding-right: 16px;
-  height: 100%; overflow-y: auto;
+  height: calc(100vh - 120px); overflow-y: auto;
 }
 .md-edit-pane { 
   min-width: 0; padding-left: 16px;
-  height: 100%;
+  height: calc(100vh - 120px);
 }
 
 /* Markdown resizer */
@@ -1052,7 +1048,7 @@ defineExpose({ renamingBlockId, editingBlockId })
 }
 
 .md-source {
-  width: 100%; height: 100%; min-height: 500px; border: 1px solid var(--border);
+  width: 100%; height: 100%; border: 1px solid var(--border);
   border-radius: var(--radius); background: var(--bg);
   font-family: 'JetBrains Mono', monospace; font-size: 13px;
   line-height: 1.7; color: var(--text-primary); resize: none;
