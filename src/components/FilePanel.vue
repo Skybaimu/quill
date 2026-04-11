@@ -16,35 +16,44 @@
           </button>
         </div>
       </div>
-      <div class="search-wrap">
-        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
+
+      <!-- 搜索栏：scope 下拉 + 输入框 + 搜索图标 -->
+      <div class="search-bar">
+        <div class="search-scope-trigger" @click.stop="scopeOpen = !scopeOpen">
+          <span class="scope-label">{{ currentScopeLabel }}</span>
+          <svg class="scope-arrow" :class="{ open: scopeOpen }" width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+        <div class="search-scope-dropdown" v-if="scopeOpen">
+          <div
+            v-for="scope in scopes"
+            :key="scope.key"
+            class="scope-option"
+            :class="{ active: store.searchScope === scope.key }"
+            @click="store.searchScope = scope.key; scopeOpen = false"
+          >{{ scope.label }}</div>
+        </div>
         <input
           type="text"
           class="search-input"
-          placeholder="搜索文件... (Ctrl+/)"
+          placeholder="搜索..."
           v-model="store.searchQuery"
           @keydown.escape="store.searchQuery = ''"
+          @focus="scopeOpen = false"
         />
+        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
         <button v-if="store.searchQuery" class="search-clear" @click="store.searchQuery = ''">
           <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
-      <div class="search-scope">
-        <button
-          v-for="scope in scopes"
-          :key="scope.key"
-          class="search-scope-btn"
-          :class="{ active: store.searchScope === scope.key }"
-          @click="store.searchScope = scope.key"
-        >{{ scope.label }}</button>
-      </div>
     </div>
 
-    <div class="file-list">
+    <div class="file-list" @click="scopeOpen = false">
       <div
         v-for="file in filteredFiles"
         :key="file.id"
@@ -79,6 +88,12 @@
             </template>
             <template v-else>{{ file.name }}</template>
           </div>
+          <!-- 导出按钮 -->
+          <button class="file-export" @click.stop="handleExport($event, file)" title="导出">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </button>
           <button class="file-more" @click.stop="openFileContext($event, file)" title="更多操作">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
@@ -104,15 +119,34 @@
         </template>
       </div>
     </div>
+
+    <!-- 导出菜单 -->
+    <div v-if="exportMenuVisible" class="export-overlay" @click="exportMenuVisible = false"></div>
+    <div v-if="exportMenuVisible" class="export-menu" :style="exportMenuStyle">
+      <div class="export-title">导出文件</div>
+      <div class="export-item" @click="doExport('md')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Markdown (.md)
+      </div>
+      <div class="export-item" @click="doExport('txt')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        纯文本 (.txt)
+      </div>
+      <div class="export-item" @click="doExport('json')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        JSON (.json)
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import {
   store, getSortedFiles, getPreview, selectFile,
   addFile as storeAddFile, getCurrentCat,
-  highlightText, formatTime, showToast
+  highlightText, formatTime, showToast,
+  exportFileAsText, exportFileAsJson, downloadFile
 } from '../stores/useStore.js'
 
 const scopes = [
@@ -125,8 +159,15 @@ const editingFileId = ref(null)
 const fileRenameInput = ref(null)
 const dragFileId = ref(null)
 const dragOverId = ref(null)
+const scopeOpen = ref(false)
+
+// Export menu
+const exportMenuVisible = ref(false)
+const exportMenuStyle = ref({})
+const exportFile = ref(null)
 
 const currentCatName = computed(() => getCurrentCat()?.name || '')
+const currentScopeLabel = computed(() => scopes.find(s => s.key === store.searchScope)?.label || '文件')
 
 const filteredFiles = computed(() => {
   const files = getSortedFiles(store.currentCat)
@@ -203,6 +244,42 @@ function finishRename(file, e) {
   editingFileId.value = null
 }
 
+// Export
+function handleExport(e, file) {
+  exportFile.value = file
+  const rect = e.target.closest('.file-export').getBoundingClientRect()
+  exportMenuStyle.value = {
+    left: Math.min(rect.left, window.innerWidth - 200) + 'px',
+    top: (rect.bottom + 4) + 'px'
+  }
+  exportMenuVisible.value = true
+}
+
+function doExport(format) {
+  const file = exportFile.value
+  if (!file) return
+  exportMenuVisible.value = false
+
+  switch (format) {
+    case 'md': {
+      const text = exportFileAsText(file.id)
+      downloadFile(text, file.name + '.md')
+      break
+    }
+    case 'txt': {
+      const text = exportFileAsText(file.id)
+      downloadFile(text, file.name + '.txt')
+      break
+    }
+    case 'json': {
+      const json = exportFileAsJson(file.id)
+      if (json) downloadFile(json, file.name + '.json', 'application/json')
+      break
+    }
+  }
+  showToast('已导出为 ' + format.toUpperCase())
+}
+
 // Drag & drop
 function onFileDragStart(e, id) {
   dragFileId.value = id
@@ -233,7 +310,6 @@ function onDragEnd() {
   document.querySelectorAll('.file-item').forEach(el => el.classList.remove('dragging'))
 }
 
-// Expose editingFileId for rename trigger from ContextMenu
 defineExpose({ editingFileId })
 </script>
 
@@ -241,67 +317,71 @@ defineExpose({ editingFileId })
 .file-panel {
   background: var(--bg);
   border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
   min-width: 0;
 }
-.file-panel.hidden {
-  width: 0;
-  opacity: 0;
-  pointer-events: none;
-}
+.file-panel.hidden { width: 0; opacity: 0; pointer-events: none; }
 
-.file-panel-header {
-  padding: 20px 16px 12px;
-  border-bottom: 1px solid var(--border-light);
-  flex-shrink: 0;
-}
-.file-panel-top {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
-}
-.file-panel-title {
-  font-family: 'Cormorant Garamond', serif; font-size: 18px;
-  font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.file-panel-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+.file-panel-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.file-panel-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-panel-actions { display: flex; gap: 4px; }
 .icon-btn {
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 6px; transition: all 0.15s;
 }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
 
-/* Search */
-.search-wrap { position: relative; }
-.search-icon {
-  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-  width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;
-}
-.search-input {
-  width: 100%; padding: 8px 30px 8px 32px;
+/* Search bar with integrated scope dropdown */
+.search-bar {
+  position: relative; display: flex; align-items: center;
   border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); font-family: inherit; font-size: 13px;
-  color: var(--text-primary); transition: all 0.2s;
+  background: var(--surface); transition: all 0.2s;
 }
-.search-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.search-bar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+
+.search-scope-trigger {
+  display: flex; align-items: center; gap: 3px; padding: 0 8px 0 10px;
+  cursor: pointer; flex-shrink: 0; border-right: 1px solid var(--border-light);
+  height: 34px; transition: background 0.15s;
+}
+.search-scope-trigger:hover { background: var(--surface-hover); }
+.scope-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.scope-arrow { color: var(--text-muted); transition: transform 0.2s; }
+.scope-arrow.open { transform: rotate(180deg); }
+
+.search-scope-dropdown {
+  position: absolute; left: 0; top: 100%; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px; z-index: 100; min-width: 100px;
+}
+.scope-option {
+  padding: 6px 12px; border-radius: 6px; font-size: 12px;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.1s;
+}
+.scope-option:hover { background: var(--surface-hover); color: var(--text-primary); }
+.scope-option.active { background: var(--accent-light); color: var(--accent); }
+
+.search-input {
+  flex: 1; padding: 8px 8px 8px 10px; border: none; background: transparent;
+  font-family: inherit; font-size: 13px; color: var(--text-primary); outline: none; min-width: 0;
+}
 .search-input::placeholder { color: var(--text-muted); }
+
+.search-icon {
+  width: 14px; height: 14px; color: var(--text-muted); flex-shrink: 0;
+  margin-right: 8px; pointer-events: none;
+}
+
 .search-clear {
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   border: none; background: transparent; cursor: pointer;
-  color: var(--text-muted); padding: 2px; border-radius: 50%;
+  color: var(--text-muted); padding: 2px; margin-right: 4px; border-radius: 50%;
+  flex-shrink: 0;
 }
 .search-clear:hover { color: var(--text-primary); background: var(--surface-hover); }
-
-.search-scope { display: flex; gap: 4px; margin-top: 8px; }
-.search-scope-btn {
-  padding: 4px 10px; border: 1px solid var(--border); background: var(--surface);
-  border-radius: 20px; font-size: 11px; color: var(--text-muted);
-  cursor: pointer; transition: all 0.15s; font-family: inherit;
-}
-.search-scope-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
 
 /* File list */
 .file-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -314,10 +394,10 @@ defineExpose({ editingFileId })
 .file-item.dragging { opacity: 0.4; }
 .file-item.drag-over { border-top: 2px solid var(--accent); padding-top: 10px; }
 
-.file-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.file-item-top { display: flex; align-items: flex-start; gap: 4px; }
 .file-name {
   font-size: 14px; font-weight: 400; color: var(--text-primary);
-  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 .file-name-input {
   flex: 1; border: none; background: var(--surface-hover); font-family: inherit;
@@ -325,12 +405,22 @@ defineExpose({ editingFileId })
 }
 .file-star { color: var(--accent); font-size: 12px; margin-right: 4px; }
 
-.file-more {
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
+.file-export {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
+  opacity: 0;
 }
+.file-item:hover .file-export { opacity: 1; }
+.file-export:hover { background: var(--accent-light); color: var(--accent); }
+
+.file-more {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); border-radius: 4px; transition: all 0.15s; flex-shrink: 0;
+  opacity: 0;
+}
+.file-item:hover .file-more { opacity: 1; }
 .file-more:hover { background: var(--surface-hover); color: var(--text-primary); }
 
 .file-preview {
@@ -341,21 +431,12 @@ defineExpose({ editingFileId })
   display: flex; align-items: center; gap: 8px; margin-top: 6px;
   font-size: 11px; color: var(--text-muted);
 }
-.file-tag {
-  padding: 2px 8px; background: var(--accent-light); color: var(--accent);
-  border-radius: 4px; font-size: 10px; font-weight: 500;
-}
+.file-tag { padding: 2px 8px; background: var(--accent-light); color: var(--accent); border-radius: 4px; font-size: 10px; font-weight: 500; }
 .file-lock { font-size: 11px; }
 .file-count { font-size: 11px; }
 .file-time { font-size: 10px; margin-left: auto; color: var(--text-muted); }
 
-/* Search highlight */
-:deep(.search-hl) {
-  background: #fef08a;
-  color: inherit;
-  padding: 1px 2px;
-  border-radius: 2px;
-}
+:deep(.search-hl) { background: #fef08a; color: inherit; padding: 1px 2px; border-radius: 2px; }
 
 .file-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -367,4 +448,23 @@ defineExpose({ editingFileId })
   font-size: 12px; color: var(--text-secondary); transition: all 0.15s;
 }
 .empty-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Export menu */
+.export-overlay { position: fixed; inset: 0; z-index: 500; }
+.export-menu {
+  position: fixed; z-index: 501; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12); padding: 8px; min-width: 180px;
+}
+.export-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); padding: 4px 10px 6px;
+}
+.export-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 6px; cursor: pointer; font-size: 13px;
+  color: var(--text-secondary); transition: all 0.1s;
+}
+.export-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.export-item svg { opacity: 0.6; }
 </style>

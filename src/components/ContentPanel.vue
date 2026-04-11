@@ -113,10 +113,11 @@
               </template>
 
               <div class="block-actions">
-                <button class="block-btn" @click.stop="copyBlock(block)" title="复制此内容块">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="block-copy-btn" @click.stop="copyBlock(block)" title="复制此内容块">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
                   </svg>
+                  复制
                 </button>
                 <button class="block-btn" @click.stop="openBlockMenu($event, block)" title="更多操作">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -529,29 +530,42 @@ defineExpose({ renamingBlockId, editingBlockId })
   animation: fadeIn 0.2s ease;
 }
 .block-header {
+  position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 8px; padding: 10px 0;
-  border-bottom: 1px solid var(--border-light); margin-bottom: 8px;
+  border-bottom: 2px solid var(--border-light); margin-bottom: 8px;
   cursor: pointer; user-select: none;
+  background: var(--surface);
+  transition: box-shadow 0.2s;
 }
 .block-toggle {
   width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-muted); transition: transform 0.25s ease; flex-shrink: 0;
+  color: var(--accent); transition: transform 0.25s ease; flex-shrink: 0;
+  opacity: 0.6;
 }
 .block-toggle.collapsed { transform: rotate(-90deg); }
 .block-title {
-  font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 500;
-  color: var(--text-primary); flex: 1;
+  font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;
+  color: #2d2520; flex: 1; letter-spacing: 0.01em;
 }
 .block-star { color: var(--accent); margin-right: 4px; }
 .block-title-input {
   flex: 1; border: none; background: var(--surface-hover);
-  font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 500;
-  color: var(--text-primary); outline: none; padding: 2px 6px; border-radius: 4px;
+  font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;
+  color: #2d2520; outline: none; padding: 2px 6px; border-radius: 4px;
 }
 .block-actions {
-  display: flex; gap: 2px; transition: opacity 0.15s;
+  display: flex; gap: 4px; transition: opacity 0.15s;
 }
+
+.block-copy-btn {
+  display: flex; align-items: center; gap: 4px; padding: 4px 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 6px; cursor: pointer; font-family: inherit;
+  font-size: 11px; color: var(--text-muted); transition: all 0.15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.block-copy-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 
 .block-btn {
   width: 26px; height: 26px;

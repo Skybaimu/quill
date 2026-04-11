@@ -273,24 +273,28 @@ export function addFile() {
   const files = store.files[store.currentCat] || []
   const cat = getCurrentCat()
   const catName = cat ? cat.name : '未命名'
+  const tag = autoTag(catName)
+  const isMd = tag === 'Markdown'
   const file = {
     id: 'f' + uid(),
     name: catName + (files.length + 1),
-    tag: autoTag(catName),
+    tag,
     pinned: false,
     starred: false,
     order: files.length,
     locked: false,
-    type: 'text',
+    type: isMd ? 'markdown' : 'text',
     updatedAt: Date.now(),
-    blocks: [{
-      id: 'b' + uid(),
-      title: '标题 1',
-      collapsed: false,
-      starred: false,
-      order: 0,
-      items: [{ id: 'i' + uid(), label: '', text: '', type: 'text' }]
-    }]
+    ...(isMd ? { content: '' } : {
+      blocks: [{
+        id: 'b' + uid(),
+        title: '标题 1',
+        collapsed: false,
+        starred: false,
+        order: 0,
+        items: [{ id: 'i' + uid(), label: '', text: '', type: 'text' }]
+      }]
+    })
   }
   files.push(file)
   store.files[store.currentCat] = files
