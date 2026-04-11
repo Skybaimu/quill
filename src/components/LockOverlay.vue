@@ -1,23 +1,35 @@
 <template>
   <div class="lock-overlay" :class="{ show: store.lockVisible }" @click.self="close">
-    <template v-if="store.lockMode === 'unlock'">
+    <!-- ===== 解锁模式 ===== -->
+    <template v-if="store.lockMode === 'unlock' && !showForgot">
       <div class="lock-title">安全验证</div>
-      <div class="lock-subtitle">请输入密码</div>
-      <div class="lock-tabs">
-        <button class="lock-tab" :class="{ active: tab === 'pattern' }" @click="tab = 'pattern'">图案</button>
-        <button class="lock-tab" :class="{ active: tab === 'pin' }" @click="tab = 'pin'">数字</button>
+
+      <!-- 解锁方式标签 -->
+      <div class="lock-tabs" v-if="hasPattern && hasPin">
+        <button class="lock-tab" :class="{ active: unlockTab === 'pattern' }" @click="unlockTab = 'pattern'">图案</button>
+        <button class="lock-tab" :class="{ active: unlockTab === 'pin' }" @click="unlockTab = 'pin'">数字</button>
+      </div>
+      <div class="lock-hint-only" v-else-if="hasPattern && !hasPin">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        仅设置了图案密码
+      </div>
+      <div class="lock-hint-only" v-else-if="!hasPattern && hasPin">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        仅设置了数字密码
       </div>
 
-      <!-- Pattern unlock -->
-      <div v-show="tab === 'pattern'">
+      <div class="lock-subtitle" v-if="hasPattern || hasPin">请输入密码解锁</div>
+
+      <!-- 图案解锁 -->
+      <div v-show="unlockTab === 'pattern' && hasPattern">
         <div class="pattern-wrap" ref="patternWrapEl">
           <div class="pattern-grid">
             <div
-              v-for="i in 9" :key="i - 1"
+              v-for="i in 9" :key="i-1"
               class="pattern-dot"
-              :class="{ active: patternDots.includes(i - 1) }"
-              @mousedown.prevent="startPattern(i - 1)"
-              @mouseenter="continuePattern(i - 1)"
+              :class="{ active: patternDots.includes(i-1) }"
+              @mousedown.prevent="startPattern(i-1)"
+              @mouseenter="continuePattern(i-1)"
             ></div>
           </div>
           <canvas class="pattern-canvas" ref="patternCanvas" width="160" height="160"></canvas>
@@ -25,8 +37,8 @@
         <div class="pattern-hint" :class="{ error: patternHintType === 'error', success: patternHintType === 'success' }">{{ patternHint }}</div>
       </div>
 
-      <!-- PIN unlock -->
-      <div v-show="tab === 'pin'">
+      <!-- 数字解锁 -->
+      <div v-show="unlockTab === 'pin' && hasPin">
         <div class="pin-display">
           <div v-for="i in 4" :key="i" class="pin-dot" :class="{ filled: pinValue.length >= i }"></div>
         </div>
@@ -38,40 +50,126 @@
         </div>
         <div class="pin-error">{{ pinError }}</div>
       </div>
-    </template>
 
-    <!-- Setup password -->
-    <template v-else-if="store.lockMode === 'setup'">
-      <div class="lock-title">设置密码</div>
-      <div class="lock-subtitle">选择一种方式</div>
-      <div class="lock-tabs" style="margin-bottom: 20px">
-        <button class="lock-tab" :class="{ active: setupTab === 'pattern' }" @click="setupTab = 'pattern'">图案密码</button>
-        <button class="lock-tab" :class="{ active: setupTab === 'pin' }" @click="setupTab = 'pin'">数字密码</button>
+      <!-- 忘记密码 -->
+      <div class="forgot-area" v-if="hasSecurityQuestions">
+        <button class="forgot-btn" @click="showForgot = true">忘记密码？</button>
       </div>
 
-      <!-- Setup pattern -->
-      <div v-show="setupTab === 'pattern'">
+      <!-- 还没设密码的提示 -->
+      <div v-if="!hasPattern && !hasPin" class="no-pw-hint">
+        <p>此文件尚未设置密码</p>
+        <button class="setup-from-unlock" @click="startSetup">立即设置</button>
+      </div>
+    </template>
+
+    <!-- ===== 忘记密码 → 安全问题 ===== -->
+    <template v-if="showForgot">
+      <div class="lock-title">安全问题验证</div>
+      <div class="lock-subtitle">请回答以下问题以重置密码</div>
+
+      <div class="forgot-questions">
+        <div v-for="(sq, idx) in currentSecurityQuestions" :key="idx" class="forgot-q-block">
+          <label class="forgot-q-label">{{ sq.question }}</label>
+          <input
+            class="forgot-q-input"
+            v-model="forgotAnswers[idx]"
+            placeholder="输入答案"
+            @keydown.enter="verifyForgot"
+          />
+        </div>
+      </div>
+      <div class="forgot-error" v-if="forgotError">{{ forgotError }}</div>
+      <div class="forgot-actions">
+        <button class="forgot-verify-btn" @click="verifyForgot" :disabled="forgotVerifying">
+          {{ forgotVerifying ? '验证中...' : '验证并重置密码' }}
+        </button>
+        <button class="forgot-cancel-btn" @click="showForgot = false; forgotError = ''">返回</button>
+      </div>
+    </template>
+
+    <!-- ===== 设置密码（三步向导） ===== -->
+    <template v-if="store.lockMode === 'setup'">
+      <!-- 进度指示 -->
+      <div class="setup-progress">
+        <div class="setup-step" :class="{ active: setupStep === 1, done: setupStep > 1 }">
+          <span class="step-num">1</span><span class="step-label">数字密码</span>
+        </div>
+        <div class="setup-connector" :class="{ done: setupStep > 1 }"></div>
+        <div class="setup-step" :class="{ active: setupStep === 2, done: setupStep > 2 }">
+          <span class="step-num">2</span><span class="step-label">图案密码</span>
+        </div>
+        <div class="setup-connector" :class="{ done: setupStep > 2 }"></div>
+        <div class="setup-step" :class="{ active: setupStep === 3 }">
+          <span class="step-num">3</span><span class="step-label">安全问题</span>
+        </div>
+      </div>
+
+      <!-- Step 1: 数字密码 -->
+      <div v-show="setupStep === 1">
+        <div class="lock-title">设置数字密码</div>
+        <div class="lock-subtitle">4 位数字，用于快速解锁</div>
+        <input type="password" class="setup-input" v-model="setupPin1" placeholder="输入 4 位数字" maxlength="4" inputmode="numeric" /><br/>
+        <input type="password" class="setup-input" v-model="setupPin2" placeholder="再次输入确认" maxlength="4" inputmode="numeric" /><br/>
+        <div class="setup-step-actions">
+          <button class="setup-next-btn" @click="goStep2">下一步</button>
+        </div>
+      </div>
+
+      <!-- Step 2: 图案密码 -->
+      <div v-show="setupStep === 2">
+        <div class="lock-title">设置图案密码</div>
+        <div class="lock-subtitle">连接至少 4 个点</div>
         <div class="pattern-wrap" ref="setupPatternWrapEl">
           <div class="pattern-grid">
             <div
-              v-for="i in 9" :key="i - 1"
+              v-for="i in 9" :key="i-1"
               class="pattern-dot"
-              :class="{ active: setupDots.includes(i - 1) }"
-              @mousedown.prevent="startSetupPattern(i - 1)"
-              @mouseenter="continueSetupPattern(i - 1)"
+              :class="{ active: setupDots.includes(i-1) }"
+              @mousedown.prevent="startSetupPattern(i-1)"
+              @mouseenter="continueSetupPattern(i-1)"
             ></div>
           </div>
           <canvas class="pattern-canvas" ref="setupPatternCanvas" width="160" height="160"></canvas>
         </div>
         <div class="pattern-hint" :class="{ error: setupHintType === 'error' }">{{ setupHint }}</div>
         <div v-if="setupConfirmed" class="pattern-hint success" style="display:block">请再次绘制确认</div>
+        <div class="setup-step-actions">
+          <button class="setup-back-btn" @click="setupStep = 1">上一步</button>
+          <button class="setup-skip-btn" @click="skipToStep3" v-if="!patternSetInSetup">跳过图案密码</button>
+        </div>
       </div>
 
-      <!-- Setup PIN -->
-      <div v-show="setupTab === 'pin'">
-        <input type="password" class="setup-input" v-model="setupPin1" placeholder="输入 4 位数字" maxlength="4" /><br/>
-        <input type="password" class="setup-input" v-model="setupPin2" placeholder="再次输入确认" maxlength="4" /><br/>
-        <button class="setup-btn" @click="saveSetupPin">设置密码</button>
+      <!-- Step 3: 安全问题 -->
+      <div v-show="setupStep === 3">
+        <div class="lock-title">安全问题（可选）</div>
+        <div class="lock-subtitle">忘记密码时可用于重置</div>
+
+        <div class="sq-setup" v-for="(sq, idx) in setupSecurityQuestions" :key="idx">
+          <div class="sq-header">
+            <select class="sq-select" v-model="sq.question">
+              <option value="" disabled>选择安全问题 {{ idx + 1 }}</option>
+              <option v-for="q in availableQuestions(idx)" :key="q" :value="q">{{ q }}</option>
+            </select>
+            <button v-if="setupSecurityQuestions.length > 1" class="sq-remove" @click="removeSQ(idx)">×</button>
+          </div>
+          <input
+            v-if="sq.question"
+            class="sq-answer-input"
+            v-model="sq.answer"
+            placeholder="输入答案"
+          />
+        </div>
+
+        <button class="sq-add-btn" @click="addSQ" v-if="setupSecurityQuestions.length < 3">
+          + 添加安全问题
+        </button>
+
+        <div class="setup-step-actions">
+          <button class="setup-back-btn" @click="setupStep = 2">上一步</button>
+          <button class="setup-done-btn" @click="finishSetup">完成设置</button>
+        </div>
+        <button class="setup-skip-btn" style="margin-top:8px" @click="finishSetup">跳过，直接完成</button>
       </div>
     </template>
 
@@ -84,14 +182,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { store, showToast } from '../stores/useStore.js'
-import { createPasswordRecord, verifyPassword, isEncryptedRecord, migratePassword } from '../utils/crypto.js'
+import {
+  createPasswordFileRecord, verifyPattern, verifyPin,
+  verifySecurityAnswer, isEncrypted, isNewPasswordFormat,
+  migratePassword, SECURITY_QUESTIONS
+} from '../utils/crypto.js'
 
-// 异步验证锁 — 防止 UI 阻塞
 const verifying = ref(false)
 
-const tab = ref('pattern')
+// --- 解锁状态 ---
+const unlockTab = ref('pattern')
 const patternDots = ref([])
 const patternDrawing = ref(false)
 const patternHint = ref('连接至少 4 个点')
@@ -102,8 +204,16 @@ const patternWrapEl = ref(null)
 const pinValue = ref('')
 const pinError = ref('')
 
-// Setup
-const setupTab = ref('pattern')
+// --- 忘记密码 ---
+const showForgot = ref(false)
+const forgotAnswers = ref({})
+const forgotError = ref('')
+const forgotVerifying = ref(false)
+
+// --- 设置密码 ---
+const setupStep = ref(1)
+const setupPin1 = ref('')
+const setupPin2 = ref('')
 const setupDots = ref([])
 const setupDrawing = ref(false)
 const setupConfirmed = ref(false)
@@ -111,38 +221,81 @@ const setupFirst = ref(null)
 const setupHint = ref('绘制图案，至少 4 个点')
 const setupHintType = ref('')
 const setupPatternCanvas = ref(null)
-const setupPin1 = ref('')
-const setupPin2 = ref('')
+const patternSetInSetup = ref(false) // 用户是否完成了图案设置
 
-watch(() => store.lockVisible, (v) => {
-  if (v) {
-    tab.value = 'pattern'
-    setupTab.value = 'pattern'
-    resetPattern()
-    resetPin()
-    resetSetup()
-    verifying.value = false
-    migrateOldPassword()
-  }
+const setupSecurityQuestions = ref([
+  { question: '', answer: '' }
+])
+
+// --- 密码记录元信息 ---
+const currentRecord = computed(() => {
+  if (!store.lockFileId) return null
+  return store.passwords[store.lockFileId]
 })
 
-/**
- * 检测并迁移旧格式密码（明文 → PBKDF2 哈希）
- * 旧格式：{ pattern: "012456" } / { pin: "1234" }
- * 新格式：{ type: "pattern", salt: "...", hash: "..." }
- */
-async function migrateOldPassword() {
+const hasPattern = computed(() => {
+  const r = currentRecord.value
+  if (!r) return false
+  if (isNewPasswordFormat(r)) return !!r.pattern
+  if (isEncrypted(r)) return r.type === 'pattern'
+  return !!r.pattern
+})
+
+const hasPin = computed(() => {
+  const r = currentRecord.value
+  if (!r) return false
+  if (isNewPasswordFormat(r)) return !!r.pin
+  if (isEncrypted(r)) return r.type === 'pin'
+  return !!r.pin
+})
+
+const hasSecurityQuestions = computed(() => {
+  const r = currentRecord.value
+  return r?.securityQuestions?.length > 0
+})
+
+const currentSecurityQuestions = computed(() => {
+  const r = currentRecord.value
+  return r?.securityQuestions || []
+})
+
+// --- 初始化 ---
+watch(() => store.lockVisible, async (v) => {
+  if (!v) return
+  // 重置所有状态
+  unlockTab.value = 'pattern'
+  patternDots.value = []
+  patternHint.value = '连接至少 4 个点'
+  patternHintType.value = ''
+  pinValue.value = ''
+  pinError.value = ''
+  verifying.value = false
+  showForgot.value = false
+  forgotAnswers.value = {}
+  forgotError.value = ''
+  forgotVerifying.value = false
+  resetSetup()
+
+  // 迁移旧密码
+  await migrateIfNeeded()
+})
+
+async function migrateIfNeeded() {
   if (!store.lockFileId) return
   const record = store.passwords[store.lockFileId]
-  if (!record || isEncryptedRecord(record)) return
-  // 旧格式，静默迁移
+  if (!record) return
+  if (isNewPasswordFormat(record)) return
   const migrated = await migratePassword(record)
-  if (migrated) {
-    store.passwords[store.lockFileId] = migrated
-  }
+  if (migrated) store.passwords[store.lockFileId] = migrated
 }
 
-// Pattern unlock
+// 根据已有密码类型，默认选择可用的解锁方式
+watch([hasPattern, hasPin], () => {
+  if (hasPattern.value) unlockTab.value = 'pattern'
+  else if (hasPin.value) unlockTab.value = 'pin'
+}, { immediate: true })
+
+// --- 图案解锁 ---
 function startPattern(idx) {
   if (verifying.value) return
   patternDrawing.value = true
@@ -176,7 +329,6 @@ function drawPattern() {
   }
 }
 
-// Listen for mouseup globally to end pattern
 watch(patternDrawing, (drawing) => {
   if (drawing) {
     const handler = () => {
@@ -196,43 +348,20 @@ async function endPattern() {
     setTimeout(resetPattern, 600)
     return
   }
-
   verifying.value = true
   patternHint.value = '验证中...'
   patternHintType.value = ''
-
-  const record = store.passwords[store.lockFileId]
-  let ok = false
-
-  if (isEncryptedRecord(record)) {
-    ok = await verifyPassword(p, record)
-  } else if (record?.pattern !== undefined) {
-    // 旧格式兼容
-    ok = record.pattern === p
-    if (ok) {
-      // 迁移到新格式
-      const migrated = await migratePassword(record)
-      if (migrated) store.passwords[store.lockFileId] = migrated
-    }
-  }
-
+  const ok = await verifyPattern(p, currentRecord.value)
   verifying.value = false
-
   if (ok) {
     patternHint.value = '验证成功'
     patternHintType.value = 'success'
-    setTimeout(() => {
-      close()
-      if (store.lockCallback) store.lockCallback()
-    }, 300)
+    setTimeout(() => { close(); if (store.lockCallback) store.lockCallback() }, 300)
   } else {
     patternHint.value = '密码错误'
     patternHintType.value = 'error'
     if (patternWrapEl.value) patternWrapEl.value.style.animation = 'shake 0.4s'
-    setTimeout(() => {
-      resetPattern()
-      if (patternWrapEl.value) patternWrapEl.value.style.animation = ''
-    }, 500)
+    setTimeout(() => { resetPattern(); if (patternWrapEl.value) patternWrapEl.value.style.animation = '' }, 500)
   }
 }
 
@@ -245,52 +374,90 @@ function resetPattern() {
   if (canvas) canvas.getContext('2d').clearRect(0, 0, 160, 160)
 }
 
-// PIN unlock
+// --- 数字解锁 ---
 function pinKey(k) {
   if (verifying.value) return
   if (k === '⌫') {
     pinValue.value = pinValue.value.slice(0, -1)
   } else if (pinValue.value.length < 4) {
     pinValue.value += k
-    if (pinValue.value.length === 4) {
-      setTimeout(verifyPin, 150)
-    }
+    if (pinValue.value.length === 4) setTimeout(verifyPinUnlock, 150)
   }
 }
 
-async function verifyPin() {
+async function verifyPinUnlock() {
   verifying.value = true
-  const record = store.passwords[store.lockFileId]
-  let ok = false
-
-  if (isEncryptedRecord(record)) {
-    ok = await verifyPassword(pinValue.value, record)
-  } else if (record?.pin !== undefined) {
-    // 旧格式兼容
-    ok = record.pin === pinValue.value
-    if (ok) {
-      const migrated = await migratePassword(record)
-      if (migrated) store.passwords[store.lockFileId] = migrated
-    }
-  }
-
+  const ok = await verifyPin(pinValue.value, currentRecord.value)
   verifying.value = false
-
   if (ok) {
     close()
     if (store.lockCallback) store.lockCallback()
   } else {
     pinError.value = '密码错误'
-    setTimeout(resetPin, 500)
+    setTimeout(() => { pinValue.value = ''; pinError.value = '' }, 500)
   }
 }
 
-function resetPin() {
-  pinValue.value = ''
-  pinError.value = ''
+// --- 忘记密码 → 安全问题 ---
+async function verifyForgot() {
+  forgotError.value = ''
+  forgotVerifying.value = true
+  const questions = currentSecurityQuestions.value
+  let allCorrect = true
+  for (let i = 0; i < questions.length; i++) {
+    const ans = forgotAnswers.value[i] || ''
+    if (!ans.trim()) { allCorrect = false; break }
+    const ok = await verifySecurityAnswer(i, ans, currentRecord.value)
+    if (!ok) { allCorrect = false; break }
+  }
+  forgotVerifying.value = false
+  if (allCorrect) {
+    // 重置密码 — 切换到设置模式
+    store.lockMode = 'setup'
+    showForgot.value = false
+    forgotAnswers.value = {}
+    showToast('验证成功，请设置新密码')
+  } else {
+    forgotError.value = '答案错误，请重试'
+  }
 }
 
-// Setup pattern
+// --- 设置密码（三步向导） ---
+function startSetup() {
+  store.lockMode = 'setup'
+  resetSetup()
+}
+
+function resetSetup() {
+  setupStep.value = 1
+  setupPin1.value = ''
+  setupPin2.value = ''
+  setupDots.value = []
+  setupDrawing.value = false
+  setupConfirmed.value = false
+  setupFirst.value = null
+  setupHint.value = '绘制图案，至少 4 个点'
+  setupHintType.value = ''
+  patternSetInSetup.value = false
+  setupSecurityQuestions.value = [{ question: '', answer: '' }]
+  const canvas = setupPatternCanvas.value
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, 160, 160)
+}
+
+function goStep2() {
+  const p1 = setupPin1.value
+  const p2 = setupPin2.value
+  if (p1.length !== 4 || !/^\d+$/.test(p1)) { showToast('请输入 4 位数字'); return }
+  if (p1 !== p2) { showToast('两次输入不一致'); return }
+  setupStep.value = 2
+}
+
+function skipToStep3() {
+  patternSetInSetup.value = false
+  setupStep.value = 3
+}
+
+// 图案设置
 function startSetupPattern(idx) {
   setupDrawing.value = true
   setupDots.value = [idx]
@@ -334,12 +501,12 @@ watch(setupDrawing, (drawing) => {
   }
 })
 
-async function endSetupPattern() {
+function endSetupPattern() {
   const p = setupDots.value.join('')
   if (p.length < 4) {
     setupHint.value = '至少 4 个点'
     setupHintType.value = 'error'
-    setTimeout(resetSetup, 600)
+    setTimeout(() => { setupDots.value = []; drawSetupPattern(); setupHint.value = '绘制图案，至少 4 个点'; setupHintType.value = '' }, 600)
     return
   }
   if (!setupConfirmed.value) {
@@ -352,53 +519,65 @@ async function endSetupPattern() {
     return
   }
   if (setupFirst.value === p) {
-    // 使用 PBKDF2 哈希存储
-    if (store.lockFileId) {
-      const record = await createPasswordRecord(p, 'pattern')
-      store.passwords[store.lockFileId] = record
-    }
-    close()
-    if (store.lockCallback) store.lockCallback()
-    showToast('密码设置成功')
+    patternSetInSetup.value = true
+    setupStep.value = 3
   } else {
     setupHint.value = '两次不一致'
     setupHintType.value = 'error'
-    setTimeout(resetSetup, 800)
+    setTimeout(() => {
+      setupDots.value = []
+      setupConfirmed.value = false
+      setupFirst.value = null
+      drawSetupPattern()
+      setupHint.value = '绘制图案，至少 4 个点'
+      setupHintType.value = ''
+    }, 800)
   }
 }
 
-function resetSetup() {
-  setupDots.value = []
-  setupDrawing.value = false
-  setupConfirmed.value = false
-  setupFirst.value = null
-  setupHint.value = '绘制图案，至少 4 个点'
-  setupHintType.value = ''
-  const canvas = setupPatternCanvas.value
-  if (canvas) canvas.getContext('2d').clearRect(0, 0, 160, 160)
-  setupPin1.value = ''
-  setupPin2.value = ''
+// 安全问题
+function availableQuestions(currentIdx) {
+  const used = setupSecurityQuestions.value
+    .filter((sq, i) => i !== currentIdx && sq.question)
+    .map(sq => sq.question)
+  return SECURITY_QUESTIONS.filter(q => !used.includes(q))
 }
 
-async function saveSetupPin() {
-  const p1 = setupPin1.value
-  const p2 = setupPin2.value
-  if (p1.length !== 4 || !/^\d+$/.test(p1)) {
-    showToast('请输入 4 位数字')
+function addSQ() {
+  if (setupSecurityQuestions.value.length < 3) {
+    setupSecurityQuestions.value.push({ question: '', answer: '' })
+  }
+}
+
+function removeSQ(idx) {
+  setupSecurityQuestions.value.splice(idx, 1)
+}
+
+// 完成设置
+async function finishSetup() {
+  const patternText = patternSetInSetup.value ? setupFirst.value : null
+  const pinText = setupPin1.value || null
+  const questions = setupSecurityQuestions.value
+    .filter(sq => sq.question && sq.answer.trim())
+    .map(sq => ({ question: sq.question, answer: sq.answer.trim() }))
+
+  if (!patternText && !pinText) {
+    showToast('至少设置一种密码')
     return
   }
-  if (p1 !== p2) {
-    showToast('两次输入不一致')
-    return
-  }
-  // 使用 PBKDF2 哈希存储
+
+  verifying.value = true
+  const record = await createPasswordFileRecord(patternText, pinText, questions)
   if (store.lockFileId) {
-    const record = await createPasswordRecord(p1, 'pin')
     store.passwords[store.lockFileId] = record
   }
+  verifying.value = false
   close()
   if (store.lockCallback) store.lockCallback()
-  showToast('密码设置成功')
+  const methods = []
+  if (pinText) methods.push('数字')
+  if (patternText) methods.push('图案')
+  showToast('密码设置成功 (' + methods.join('+') + ')')
 }
 
 function close() {
@@ -406,6 +585,7 @@ function close() {
   store.lockCallback = null
   store.lockFileId = null
   verifying.value = false
+  showForgot.value = false
 }
 </script>
 
@@ -425,6 +605,13 @@ function close() {
 }
 .lock-tab.active { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
 
+.lock-hint-only {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--text-muted); margin-bottom: 16px; padding: 5px 12px;
+  background: var(--surface-hover); border-radius: 20px;
+}
+
+/* Pattern */
 .pattern-wrap { position: relative; width: 160px; height: 160px; margin-bottom: 20px; }
 .pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
 .pattern-dot {
@@ -437,6 +624,7 @@ function close() {
 .pattern-hint.error { color: var(--danger); }
 .pattern-hint.success { color: var(--success); }
 
+/* PIN */
 .pin-display { display: flex; gap: 14px; margin-bottom: 24px; justify-content: center; }
 .pin-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); transition: all 0.15s; }
 .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
@@ -453,19 +641,131 @@ function close() {
 .pin-key.backspace { font-size: 14px; color: var(--text-muted); }
 .pin-error { color: var(--danger); font-size: 12px; min-height: 18px; margin-top: 8px; text-align: center; }
 
+/* Setup wizard */
+.setup-progress {
+  display: flex; align-items: center; gap: 0; margin-bottom: 32px; padding: 0 8px;
+}
+.setup-step {
+  display: flex; align-items: center; gap: 8px; opacity: 0.4; transition: all 0.3s;
+}
+.setup-step.active { opacity: 1; }
+.setup-step.done { opacity: 0.7; }
+.step-num {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text-muted); transition: all 0.3s;
+}
+.setup-step.active .step-num { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.setup-step.done .step-num { border-color: var(--success); color: var(--success); background: rgba(74,140,111,0.1); }
+.step-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.setup-step.active .step-label { color: var(--text-primary); }
+.setup-connector {
+  width: 40px; height: 2px; background: var(--border); margin: 0 8px;
+  transition: background 0.3s;
+}
+.setup-connector.done { background: var(--success); }
+
 .setup-input {
   width: 200px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
   font-family: inherit; font-size: 14px; text-align: center; margin-bottom: 10px;
   background: var(--surface); color: var(--text-primary);
 }
 .setup-input:focus { outline: none; border-color: var(--accent); }
-.setup-btn {
-  padding: 10px 22px; background: var(--text-primary); color: var(--bg);
-  border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit;
-  font-size: 13px; transition: all 0.15s; margin-top: 8px;
-}
-.setup-btn:hover { background: var(--text-secondary); }
 
+.setup-step-actions {
+  display: flex; gap: 10px; justify-content: center; margin-top: 16px;
+}
+.setup-next-btn, .setup-done-btn {
+  padding: 10px 28px; background: var(--text-primary); color: var(--bg);
+  border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit;
+  font-size: 13px; transition: all 0.15s;
+}
+.setup-next-btn:hover, .setup-done-btn:hover { background: var(--text-secondary); }
+.setup-back-btn {
+  padding: 10px 20px; background: transparent; border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; font-family: inherit;
+  font-size: 13px; color: var(--text-muted); transition: all 0.15s;
+}
+.setup-back-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.setup-skip-btn {
+  padding: 6px 14px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-muted); transition: all 0.15s;
+}
+.setup-skip-btn:hover { color: var(--accent); }
+
+/* Security questions setup */
+.sq-setup {
+  background: var(--surface-hover); border-radius: var(--radius); padding: 14px;
+  margin-bottom: 12px; width: 320px;
+}
+.sq-header { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sq-select {
+  flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: inherit; font-size: 13px; background: var(--surface); color: var(--text-primary);
+  cursor: pointer;
+}
+.sq-select:focus { outline: none; border-color: var(--accent); }
+.sq-remove {
+  width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 16px; border-radius: 4px;
+}
+.sq-remove:hover { background: var(--danger-light); color: var(--danger); }
+.sq-answer-input {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: inherit; font-size: 13px; background: var(--surface); color: var(--text-primary);
+}
+.sq-answer-input:focus { outline: none; border-color: var(--accent); }
+
+.sq-add-btn {
+  display: block; width: 320px; padding: 10px; border: 1px dashed var(--border);
+  border-radius: var(--radius); background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-muted); margin-bottom: 16px;
+  transition: all 0.15s;
+}
+.sq-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Forgot password */
+.forgot-questions { width: 320px; margin-bottom: 16px; }
+.forgot-q-block { margin-bottom: 14px; }
+.forgot-q-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+.forgot-q-input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: inherit; font-size: 14px; background: var(--surface); color: var(--text-primary);
+}
+.forgot-q-input:focus { outline: none; border-color: var(--accent); }
+.forgot-error { color: var(--danger); font-size: 12px; margin-bottom: 12px; text-align: center; }
+.forgot-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.forgot-verify-btn {
+  padding: 10px 28px; background: var(--text-primary); color: var(--bg);
+  border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit;
+  font-size: 13px; transition: all 0.15s;
+}
+.forgot-verify-btn:hover { background: var(--text-secondary); }
+.forgot-verify-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.forgot-cancel-btn {
+  padding: 6px 14px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-muted);
+}
+
+/* No password hint */
+.no-pw-hint { text-align: center; padding: 20px 0; }
+.no-pw-hint p { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+.setup-from-unlock {
+  padding: 10px 24px; background: var(--text-primary); color: var(--bg);
+  border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit;
+  font-size: 13px; transition: all 0.15s;
+}
+.setup-from-unlock:hover { background: var(--text-secondary); }
+
+/* Forgot link */
+.forgot-area { margin-top: 16px; }
+.forgot-btn {
+  padding: 6px 14px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-muted); transition: color 0.15s;
+}
+.forgot-btn:hover { color: var(--accent); }
+
+/* Verifying */
 .verifying-indicator {
   display: flex; align-items: center; gap: 10px; margin-top: 12px;
   font-size: 12px; color: var(--text-muted);
