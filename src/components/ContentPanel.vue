@@ -84,8 +84,8 @@
               </li>
             </ul>
           </div>
-          <div class="md-preview-pane">
-            <div class="md-content" v-html="renderMd(currentFile.content || '')" @scroll="syncScroll('preview', $event)"></div>
+          <div class="md-preview-pane" @scroll="syncScroll('preview', $event)">
+            <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
           </div>
           <div
             class="md-resizer"
@@ -429,7 +429,9 @@ function renderMd(text) {
   const parser = new marked.Parser()
   const originalParse = parser.parse.bind(parser)
   parser.parse = function(tokens) {
-    this.renderer._currentLine = tokens[0]?._line
+    if (tokens && tokens[0]) {
+      this.renderer._currentLine = tokens[0]._line
+    }
     return originalParse(tokens)
   }
 
@@ -530,17 +532,35 @@ function syncCursorToPreview(e) {
   
   elements.forEach(el => {
     const line = parseInt(el.getAttribute('data-line') || 0)
-    const diff = currentLine - line
-    if (diff >= 0 && diff < minDiff) {
+    const diff = Math.abs(currentLine - line) // Use absolute difference to find closest
+    if (diff < minDiff) {
       minDiff = diff
       closestEl = el
     }
   })
   
-  if (closestEl && minDiff < 10) {
+  if (closestEl) {
     // Only smooth scroll if we're not actively dragging the scrollbar
     if (!isSyncingLeft && !isSyncingRight) {
-      closestEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Temporarily set flags to prevent infinite loop from scrollIntoView triggering scroll events
+      isSyncingRight = true
+      isSyncingLeft = true
+      
+      // Calculate offset manually instead of scrollIntoView to avoid triggering global window scroll
+      const previewRect = preview.getBoundingClientRect()
+      const elRect = closestEl.getBoundingClientRect()
+      const targetScrollTop = preview.scrollTop + (elRect.top - previewRect.top) - (previewRect.height / 3)
+      
+      preview.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
+      })
+      
+      clearTimeout(syncTimeout)
+      syncTimeout = setTimeout(() => {
+        isSyncingLeft = false
+        isSyncingRight = false
+      }, 500) // Longer timeout for smooth scroll to finish
     }
   }
 }
