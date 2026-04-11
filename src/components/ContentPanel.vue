@@ -28,6 +28,12 @@
           </svg>
           锁定
         </button>
+        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked()) && mdToc.length > 0 && !store.mdEditMode" @click="store.mdTocCollapsed = !store.mdTocCollapsed" :title="store.mdTocCollapsed ? '展开大纲' : '收起大纲'">
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h7"/>
+          </svg>
+          大纲
+        </button>
         <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -71,16 +77,6 @@
       <template v-else-if="currentFile.type === 'markdown'">
         <div class="md-wrapper" :class="{ editing: store.mdEditMode, 'has-toc': mdToc.length > 0 && !store.mdTocCollapsed }">
           
-          <!-- Floating TOC toggle button when collapsed -->
-          <button 
-            v-if="mdToc.length > 0 && !store.mdEditMode && store.mdTocCollapsed" 
-            class="md-toc-floating-btn" 
-            @click="store.mdTocCollapsed = false" 
-            title="展开大纲"
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-          </button>
-
           <!-- Main TOC Pane -->
           <div class="md-toc-pane" v-if="mdToc.length > 0 && !store.mdEditMode && !store.mdTocCollapsed">
             <div class="md-toc-header">
@@ -202,6 +198,7 @@
                       :value="item.text"
                       @blur="saveBlockText(block, item, $event)"
                       @input="autoGrow($event.target)"
+                      @keydown.esc="$event.target.blur()"
                       ref="blockTextareaRef"
                       spellcheck="false"
                     ></textarea>
@@ -979,24 +976,6 @@ defineExpose({ renamingBlockId, editingBlockId })
   position: sticky; top: 0; height: calc(100vh - 120px);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-}
-
-.md-toc-floating-btn {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 20;
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: 8px;
-  transition: all 0.2s;
-}
-.md-toc-floating-btn:hover {
-  background: var(--surface-hover); color: var(--accent);
 }
 
 .md-toc-header {
