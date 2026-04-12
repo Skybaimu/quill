@@ -57,8 +57,8 @@ function doAction(act) {
 
   switch (act) {
     case 'rename': {
-      const n = prompt('重命名内容块', block.title)
-      if (n !== null && n.trim()) block.title = n.trim()
+      const event = new CustomEvent('quill-inline-rename-block', { detail: { id: blockId } })
+      window.dispatchEvent(event)
       break
     }
     case 'star':

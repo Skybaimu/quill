@@ -90,19 +90,20 @@
                 @keydown.escape="$event.target.blur()"
                 @click.stop
                 ref="fileRenameInput"
+                autofocus
               />
             </template>
-            <template v-else>{{ file.name }}</template>
+            <span v-else class="file-name-text">{{ file.name }}</span>
           </div>
           <!-- 导出按钮 -->
           <button class="file-export" @click.stop="handleExport($event, file)" title="导出">
-            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
             </svg>
           </button>
           <button class="file-more" @click.stop="openFileContext($event, file)" title="更多操作">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
             </svg>
           </button>
         </div>
@@ -147,7 +148,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import {
   store, getSortedFiles, getPreview, selectFile,
   addFile as storeAddFile, getCurrentCat,
@@ -274,6 +275,31 @@ function openFileContext(e, file) {
   store.ctxType = 'file'
   store.ctxVisible = true
 }
+
+// Inline Rename via Context Menu Event
+function handleInlineRenameEvent(e) {
+  const fileId = e.detail.id
+  if (fileId) {
+    editingFileId.value = fileId
+    nextTick(() => {
+      if (fileRenameInput.value && fileRenameInput.value[0]) {
+        fileRenameInput.value[0].focus()
+        fileRenameInput.value[0].select()
+      } else if (fileRenameInput.value) {
+        fileRenameInput.value.focus()
+        fileRenameInput.value.select()
+      }
+    })
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('quill-inline-rename-file', handleInlineRenameEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('quill-inline-rename-file', handleInlineRenameEvent)
+})
 
 function finishRename(file, e) {
   const val = e.target.value.trim()
@@ -453,14 +479,19 @@ defineExpose({ editingFileId })
 
 .file-item-top { display: flex; align-items: flex-start; gap: 4px; }
 .file-name {
+  display: flex; align-items: center;
   font-size: 14px; font-weight: 400; color: var(--text-primary);
+  flex: 1; min-width: 0;
+}
+.file-name-text {
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 .file-name-input {
   flex: 1; border: none; background: var(--surface-hover); font-family: inherit;
   font-size: 14px; color: var(--text-primary); outline: none; padding: 2px 6px; border-radius: 4px;
+  min-width: 0;
 }
-.file-star { color: var(--accent); font-size: 12px; margin-right: 4px; }
+.file-star { color: var(--accent); font-size: 12px; margin-right: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
 .file-export {
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;

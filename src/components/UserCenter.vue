@@ -85,15 +85,6 @@
         </div>
 
         <div class="uc-section">
-          <div class="uc-section-title">数据</div>
-          <button class="uc-pw-btn uc-reset-btn" @click="handleReset">
-            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            恢复默认数据
-          </button>
-          <div class="uc-pw-hint">将清除所有数据并恢复为初始状态</div>
-        </div>
-
-        <div class="uc-section">
           <div class="uc-section-title">快捷键</div>
           <div class="uc-shortcuts">
             <div class="uc-shortcut"><span class="sc-key">Ctrl+N</span><span>新建文件</span></div>
@@ -102,6 +93,15 @@
             <div class="uc-shortcut"><span class="sc-key">Ctrl+⇧+N</span><span>新内容块</span></div>
             <div class="uc-shortcut"><span class="sc-key">Esc</span><span>关闭弹窗</span></div>
           </div>
+        </div>
+
+        <div class="uc-section">
+          <div class="uc-section-title">数据</div>
+          <button class="uc-pw-btn uc-reset-btn" @click="handleReset">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            恢复默认数据
+          </button>
+          <div class="uc-pw-hint">将清除所有数据并恢复为初始状态</div>
         </div>
 
         <div class="uc-section">

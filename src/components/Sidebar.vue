@@ -88,14 +88,15 @@
                 @keydown.enter="$event.target.blur()"
                 @keydown.escape="cancelCatEdit"
                 @click.stop
+                autofocus
               />
             </template>
             <template v-else>
               <span class="cat-name">{{ cat.name || '未命名分类' }}</span>
               <span class="cat-count">{{ getFileCount(cat.id) }}</span>
               <button class="cat-more" @click.stop="openCatContext($event, cat)" title="更多操作">
-                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
                 </svg>
               </button>
             </template>
@@ -169,6 +170,33 @@ const catNameInputRef = ref(null)
 const dragCatId = ref(null)
 const dragOverId = ref(null)
 const showMenu = ref(false)
+
+// Inline Rename via Context Menu Event
+function handleInlineRenameCategoryEvent(e) {
+  const catId = e.detail.id
+  if (catId) {
+    editingCatId.value = catId
+    nextTick(() => {
+      if (catNameInputRef.value && catNameInputRef.value[0]) {
+        catNameInputRef.value[0].focus()
+        catNameInputRef.value[0].select()
+      } else if (catNameInputRef.value) {
+        catNameInputRef.value.focus()
+        catNameInputRef.value.select()
+      }
+    })
+  }
+}
+
+import { onMounted, onUnmounted } from 'vue'
+
+onMounted(() => {
+  window.addEventListener('quill-inline-rename-category', handleInlineRenameCategoryEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('quill-inline-rename-category', handleInlineRenameCategoryEvent)
+})
 
 const DEFAULT_CAT_IDS = new Set(['c1', 'c2', 'c3', 'c4'])
 

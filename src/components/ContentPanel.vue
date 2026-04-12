@@ -167,12 +167,18 @@
                   @keydown.escape="renamingBlockId = null"
                   @click.stop
                   ref="blockRenameRef"
+                  autofocus
                 />
               </template>
               <template v-else>
                 <div class="block-title">
                   <span v-if="block.starred" class="block-star">★</span>
                   <span v-html="hlText(block.title)"></span>
+                  <button class="block-inline-edit-btn" @click.stop="startBlockRename(block)" title="重命名">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                  </button>
                 </div>
               </template>
 
@@ -181,8 +187,8 @@
                   复制
                 </button>
                 <button class="block-btn" @click.stop="openBlockMenu($event, block)" title="更多操作">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
                   </svg>
                 </button>
               </div>
@@ -242,7 +248,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, nextTick, watch, onMounted, onUnmounted, shallowRef } from 'vue'
 import {
   store, findFile, getCurrentCat, addBlock as storeAddBlock, deleteBlock,
   addFile as storeAddFile, selectFile as storeSelectFile,
@@ -372,8 +378,9 @@ marked.use(markedHighlight({
 }))
 
 // Markdown rendering
-const mdToc = ref([])
-const lineMap = ref([])
+const mdTocStr = ref('[]')
+const mdToc = shallowRef([])
+const lineMap = shallowRef([])
 
 const renderer = new marked.Renderer()
 // Helper to extract the token line number before rendering
@@ -403,22 +410,16 @@ marked.use({ renderer })
 
 function renderMd(text) {
   if (!text) {
-    mdToc.value = []
-    lineMap.value = []
     return '<p style="color:var(--text-muted)">暂无内容</p>'
   }
   
   // Add line numbers to tokens for cursor mapping
   const tokens = marked.lexer(text)
-  const lines = text.split('\n')
-  let currentLine = 0
   
-  // Custom lexer traversal to attach line numbers to tokens
-  function attachLines(tokens) {
-    for (const token of tokens) {
+  let currentLine = 0
+  function attachLines(tokensList) {
+    for (const token of tokensList) {
       if (token.raw) {
-        // Find the line where this token starts
-        // This is a simplified approach, a true AST mapper would be more complex
         token._line = currentLine
         const newlines = (token.raw.match(/\n/g) || []).length
         currentLine += newlines
@@ -429,32 +430,67 @@ function renderMd(text) {
   }
   attachLines(tokens)
   
-  const toc = []
-  const map = []
-  tokens.forEach(token => {
-    if (token.type === 'heading' && token.depth <= 3) {
-      const headingText = token.text
-      const id = 'heading-' + headingText.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-      toc.push({ level: token.depth, text: headingText, id })
-    }
-    if (token._line !== undefined) {
-      map.push({ line: token._line, type: token.type })
-    }
-  })
-  
-  const tocStr = JSON.stringify(toc)
-  if (JSON.stringify(mdToc.value) !== tocStr) {
-    mdToc.value = toc
-  }
-  lineMap.value = map
-
-  // Hack parser is no longer needed since we read directly from tokens in the renderer
   const rawHtml = marked.parser(tokens, { renderer })
   if (hasQuery.value) {
     return highlightText(rawHtml, store.searchQuery.trim())
   }
   return rawHtml
 }
+
+// Extract TOC and line mappings when file content changes
+watch(() => currentFile.value?.content, (newContent) => {
+  if (currentFile.value?.type !== 'markdown' || !newContent) {
+    mdToc.value = []
+    lineMap.value = []
+    mdTocStr.value = '[]'
+    return
+  }
+
+  const tokens = marked.lexer(newContent)
+  let currentLine = 0
+
+  function attachLines(tokensList) {
+    for (const token of tokensList) {
+      if (token.raw) {
+        token._line = currentLine
+        const newlines = (token.raw.match(/\n/g) || []).length
+        currentLine += newlines
+      }
+      if (token.tokens) attachLines(token.tokens)
+      if (token.items) attachLines(token.items)
+    }
+  }
+  attachLines(tokens)
+
+  const toc = []
+  const map = []
+
+  function extractTocAndMap(tokensList) {
+    for (const token of tokensList) {
+      if (token.type === 'heading' && token.depth <= 3) {
+        const headingText = token.text
+        const id = 'heading-' + headingText.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+        toc.push({ level: token.depth, text: headingText, id })
+      }
+      if (token._line !== undefined) {
+        map.push({ line: token._line, type: token.type })
+      }
+      if (token.tokens) extractTocAndMap(token.tokens)
+      if (token.items) extractTocAndMap(token.items)
+    }
+  }
+  extractTocAndMap(tokens)
+
+  const newTocStr = JSON.stringify(toc)
+  if (mdTocStr.value !== newTocStr) {
+    mdTocStr.value = newTocStr
+    mdToc.value = toc
+  }
+  
+  if (lineMap.value.length !== map.length) {
+    lineMap.value = map
+  }
+}, { immediate: true })
 
 function scrollToHeading(id) {
   const el = document.getElementById(id)
@@ -496,6 +532,7 @@ function startMdResize(e) {
 let isSyncingLeft = false
 let isSyncingRight = false
 let syncTimeout = null
+let cursorSyncTimeout = null
 
 function syncScroll(sourceType, e) {
   const source = e.target
@@ -528,25 +565,28 @@ function syncScroll(sourceType, e) {
 }
 
 function syncCursorToPreview(e) {
+  // If user is just scrolling or we are in the middle of a scroll sync, don't jump the cursor
+  if (isSyncingLeft || isSyncingRight) return
+
   const textarea = e.target
   const content = textarea.value
   const cursorIndex = textarea.selectionStart
   
-  // Calculate current line number based on cursor index
   const textBeforeCursor = content.substring(0, cursorIndex)
   const currentLine = (textBeforeCursor.match(/\n/g) || []).length
 
-  // Find the closest DOM element with this line number
   const preview = textarea.closest('.md-wrapper')?.querySelector('.md-preview-pane')
   if (!preview) return
   
   const elements = preview.querySelectorAll('[data-line]')
+  if (!elements || elements.length === 0) return
+
   let closestEl = null
   let minDiff = Infinity
   
   elements.forEach(el => {
     const line = parseInt(el.getAttribute('data-line') || 0)
-    const diff = Math.abs(currentLine - line) // Use absolute difference to find closest
+    const diff = Math.abs(currentLine - line)
     if (diff < minDiff) {
       minDiff = diff
       closestEl = el
@@ -554,28 +594,27 @@ function syncCursorToPreview(e) {
   })
   
   if (closestEl) {
-    // Only smooth scroll if we're not actively dragging the scrollbar
-    if (!isSyncingLeft && !isSyncingRight) {
-      // Temporarily set flags to prevent infinite loop from scrollIntoView triggering scroll events
-      isSyncingRight = true
-      isSyncingLeft = true
-      
-      // Calculate offset manually instead of scrollIntoView to avoid triggering global window scroll
-      const previewRect = preview.getBoundingClientRect()
-      const elRect = closestEl.getBoundingClientRect()
-      const targetScrollTop = preview.scrollTop + (elRect.top - previewRect.top) - (previewRect.height / 3)
-      
-      preview.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: 'smooth'
-      })
-      
-      clearTimeout(syncTimeout)
-      syncTimeout = setTimeout(() => {
-        isSyncingLeft = false
-        isSyncingRight = false
-      }, 500) // Longer timeout for smooth scroll to finish
-    }
+    // We are forcing a sync via cursor, lock both scroll listeners
+    isSyncingRight = true
+    isSyncingLeft = true
+    
+    const previewRect = preview.getBoundingClientRect()
+    const elRect = closestEl.getBoundingClientRect()
+    // Align element to approximately 1/3 of the preview pane height
+    const targetScrollTop = preview.scrollTop + (elRect.top - previewRect.top) - (previewRect.height / 3)
+    
+    preview.scrollTo({
+      top: Math.max(0, targetScrollTop),
+      behavior: 'smooth'
+    })
+    
+    clearTimeout(syncTimeout)
+    clearTimeout(cursorSyncTimeout)
+    // Wait for the smooth scroll animation to complete before releasing the lock
+    cursorSyncTimeout = setTimeout(() => {
+      isSyncingLeft = false
+      isSyncingRight = false
+    }, 500)
   }
 }
 
@@ -658,6 +697,39 @@ function autoGrow(el) {
   el.style.height = 'auto'
   el.style.height = Math.max(120, el.scrollHeight) + 'px'
 }
+
+function startBlockRename(block) {
+  renamingBlockId.value = block.id
+  nextTick(() => {
+    if (blockRenameRef.value && blockRenameRef.value[0]) {
+      blockRenameRef.value[0].focus()
+      blockRenameRef.value[0].select()
+    } else if (blockRenameRef.value) {
+      blockRenameRef.value.focus()
+      blockRenameRef.value.select()
+    }
+  })
+}
+
+function handleInlineRenameBlockEvent(e) {
+  const id = e.detail.id
+  if (id) {
+    const file = currentFile.value
+    if (file && file.blocks) {
+      const block = file.blocks.find(b => b.id === id)
+      if (block) startBlockRename(block)
+    }
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('quill-inline-rename-block', handleInlineRenameBlockEvent)
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('quill-inline-rename-block', handleInlineRenameBlockEvent)
+})
 
 function finishBlockRename(block, e) {
   const val = e.target.value.trim()
@@ -750,13 +822,6 @@ function handleKeyDown(e) {
   }
 }
 
-onMounted(() => {
-  document.addEventListener('keydown', handleKeyDown)
-})
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeyDown)
-})
-
 // Listen for block rename trigger from BlockMenu
 watch(() => store.blockMenuVisible, (v) => {
   if (!v && store.blockMenuTarget) {
@@ -842,8 +907,16 @@ defineExpose({ renamingBlockId, editingBlockId })
 }
 .block-toggle:hover { color: var(--accent); }
 .block-toggle.collapsed { transform: rotate(-90deg); }
-.block-title { font-family: 'Cormorant Garamond', serif; font-size: calc(var(--app-font-size) + 2px); font-weight: 500; color: var(--text-primary); flex: 1; }
+.block-title { font-family: 'Cormorant Garamond', serif; font-size: calc(var(--app-font-size) + 2px); font-weight: 500; color: var(--text-primary); flex: 1; display: flex; align-items: center; gap: 6px; }
 .block-star { color: var(--accent); margin-right: 4px; }
+.block-inline-edit-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; border-radius: 4px;
+  opacity: 0; transition: all 0.15s;
+}
+.block-header:hover .block-inline-edit-btn { opacity: 0.6; }
+.block-inline-edit-btn:hover { opacity: 1 !important; background: var(--surface-hover); color: var(--text-primary); }
 .block-title-input {
   flex: 1; border: none; background: var(--surface-hover);
   font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;

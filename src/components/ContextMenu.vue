@@ -91,8 +91,9 @@ function doAction(act) {
     if (!file) return
     switch (act) {
       case 'rename': {
-        const n = prompt('重命名文件', file.name)
-        if (n !== null && n.trim()) file.name = n.trim()
+        // 派发事件，让父组件处理内联重命名
+        const event = new CustomEvent('quill-inline-rename-file', { detail: { id: file.id } })
+        window.dispatchEvent(event)
         break
       }
       case 'pin':
@@ -123,8 +124,8 @@ function doAction(act) {
     if (!cat) return
     switch (act) {
       case 'rename': {
-        const n = prompt('重命名分类', cat.name)
-        if (n !== null && n.trim()) cat.name = n.trim()
+        const event = new CustomEvent('quill-inline-rename-category', { detail: { id: cat.id } })
+        window.dispatchEvent(event)
         break
       }
       case 'pin':

@@ -75,17 +75,17 @@
 
 /* Sakura Pink Theme */
 :root[data-theme="sakura"] {
-  --bg: #fdf6f5;
-  --surface: #fff0f5;
-  --surface-hover: #fbe0e9;
-  --surface-active: #f9d0dd;
-  --border: #f9d0dd;
-  --border-light: #fbe0e9;
-  --text-primary: #5c3a45;
-  --text-secondary: #8c5a6b;
-  --text-muted: #b58394;
-  --accent: #e57399;
-  --accent-light: #fbe0e9;
+  --bg: #fcf8f9;
+  --surface: #fffafb;
+  --surface-hover: #fcedf1;
+  --surface-active: #fae1e7;
+  --border: #fae1e7;
+  --border-light: #fcedf1;
+  --text-primary: #544448;
+  --text-secondary: #7d676d;
+  --text-muted: #a38d93;
+  --accent: #d8839a;
+  --accent-light: #f9e6ea;
 }
 
 * {
