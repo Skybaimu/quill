@@ -164,26 +164,8 @@
             <transition name="block-expand">
               <div class="block-content" v-show="!block.collapsed">
                 <template v-for="item in block.items" :key="item.id">
-                  <!-- API type -->
-                  <div v-if="item.type === 'api'" class="api-block" :class="{ locked: item._locked !== false }">
-                    <div class="api-inner">
-                      <div class="api-label">{{ item.label }}</div>
-                      <div class="api-value">
-                        <span v-html="hlText(item.text)"></span>
-                        <button class="api-copy" @click.stop="copyText(item.text, item.label)">复制</button>
-                      </div>
-                    </div>
-                    <div class="api-unlock-overlay">
-                      <button class="api-unlock-btn" @click.stop="unlockApi(item)">
-                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                        </svg>
-                        点击解锁
-                      </button>
-                    </div>
-                  </div>
                   <!-- Text type -->
-                  <div v-else class="block-text-wrap">
+                  <div class="block-text-wrap">
                     <div
                       v-if="editingBlockId !== block.id"
                       class="block-text-display"

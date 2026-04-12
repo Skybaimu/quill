@@ -341,12 +341,18 @@ function onDragEnd() {
 }
 .logo {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 22px;
-  font-weight: 300;
-  letter-spacing: 0.06em;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   white-space: nowrap;
+  display: flex;
+  align-items: baseline;
 }
-.logo-q { color: var(--accent); }
+.logo-q { 
+  color: var(--accent); 
+  font-size: 32px;
+  margin-right: -1px;
+}
 
 .toggle-btn {
   width: 28px; height: 28px;

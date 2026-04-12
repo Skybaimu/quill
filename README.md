@@ -15,14 +15,30 @@
 ```bash
 cd quill
 npm install
+
+# 1. 浏览器开发与构建
 npm run dev          # 浏览器预览（开发模式）
 npm run build        # 构建 Web 版本
-npm run tauri dev    # Tauri 桌面应用（需 Rust 环境）
+
+# 2. Tauri 桌面端开发与打包（需安装 Rust 环境）
+npm run tauri dev    # 启动 Tauri 桌面端开发调试
+
+# Windows 用户打包:
+# 会在 src-tauri/target/release/bundle/msi 下生成 .msi 安装包
+# 和 src-tauri/target/release/bundle/nsis 下的独立 .exe 文件
+npm run tauri build
+
+# macOS 用户打包:
+# 会在 src-tauri/target/release/bundle/macos 下生成 .app 应用程序
+# 和 src-tauri/target/release/bundle/dmg 下的 .dmg 安装镜像
+npm run tauri build
 ```
 
 ### 环境要求
 - Node.js 18+
 - Rust（仅 Tauri 桌面版需要）：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Windows 打包要求**：需要安装 [C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 和 [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。
+- **macOS 打包要求**：需要安装 Xcode Command Line Tools (`xcode-select --install`)。
 
 ## 📁 项目结构
 

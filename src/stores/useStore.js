@@ -41,8 +41,8 @@ const defaultData = {
           {
             id: 'b3', title: 'AI 服务', collapsed: false, starred: false, order: 0,
             items: [
-              { id: 'i4', label: 'OpenAI', text: 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'api', _locked: true },
-              { id: 'i5', label: 'Anthropic', text: 'sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'api', _locked: true }
+              { id: 'i4', label: 'OpenAI', text: 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'text' },
+              { id: 'i5', label: 'Anthropic', text: 'sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'text' }
             ]
           }
         ]

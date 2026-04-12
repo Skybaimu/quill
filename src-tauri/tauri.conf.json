@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "quill",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "productName": "Quill",
+  "version": "1.5.0",
+  "identifier": "com.skybaimu.quill",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -25,7 +25,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": "nsis",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,8 +50,7 @@
         "template": null,
         "installMode": "both",
         "languages": ["SimpChinese", "English"],
-        "displayLanguageSelector": false,
-        "installerHooks": "nsis/install-hooks.nsh"
+        "displayLanguageSelector": false
       },
       "wix": null
     }
