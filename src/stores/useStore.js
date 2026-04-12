@@ -64,9 +64,39 @@ const defaultData = {
     ],
     c4: [
       {
-        id: 'f4', name: 'README 模板', tag: 'Markdown', pinned: false, starred: false,
+        id: 'f4', name: '欢迎使用 Quill', tag: 'Markdown', pinned: true, starred: false,
         order: 0, locked: false, type: 'markdown', updatedAt: Date.now(),
-        content: '# 项目名称\n\n## 简介\n这是一个示例项目\n\n## 功能\n- 功能1\n- 功能2\n\n## 安装\n```bash\nnpm install\n```\n\n## 使用\n```javascript\nimport { something } from \'package\'\n```'
+        content: `# 欢迎来到 Quill 🚀
+
+Quill 是一款专为**全栈工程师、独立开发者与创作者**打造的**轻快、优雅、安全**的个人知识管理与代码片段工具。
+
+## 💡 开发初衷
+
+作为一个经常穿梭于产品构想、软件设计、UI 设计、生图生视频的全栈工程师，我每天都要处理海量的 **AI 提示词、API Key 和灵感碎片**。
+曾经，我尝试过很多工具：
+- **Windows 文本文档**：虽然打开极快，但内容一长就无法折叠，长篇的提示词和想法堆在一起，没有标题，翻找起来极为痛苦。
+- **Word**：过于笨重卡顿，且排版不够极客。
+- **IDE 或 Typora**：看 Markdown 固然好，但对于只是想快速记个点子或查个密码来说，实在太过沉重。
+
+**于是，Quill 诞生了。** 我想要一个：
+> 拥有大类结构，点击类别就能快速创建文件。文件里有清晰且充满**空间感、呼吸感**的标题与内容层级。长篇的提示词和代码可以**一键折叠、一键复制**。
+> 同时，它必须能**秒开 Markdown 文件**，默认以干净清爽的预览态呈现。如果需要编辑，只需一键展开双栏，所见即所得。
+
+## ✨ 核心特性
+
+- **极致速度与轻量**：基于 \`Tauri v2\` + \`Vue 3\` 构建，瞬间启动。
+- **优雅的碎片管理**：特有的“内容块”设计，轻松收纳长文本、提示词，支持一键折叠与复制。
+- **程序员友好**：原生支持拖入 \`.json\`, \`.log\`, \`.js\`, \`.py\` 等格式，秒开纯净代码编辑模式。
+- **沉浸式 Markdown**：支持双向滚动同步，自动生成大纲 TOC。
+- **极简设计**：4 种精美主题（亮色、暗色、护眼、樱花），全局字号无极缩放，界面清爽干净。
+- **隐私保护**：支持分类级别的图形/数字密码锁，内容防窥，拒绝未授权导出。
+
+## 📬 交流与反馈
+
+我是 **Sky白木**，如果您在使用中遇到任何问题，或者有任何新的点子和需求，欢迎随时给我发邮件反馈：  
+📧 **[skybaimu@gmail.com](mailto:skybaimu@gmail.com)**
+
+> 尝试一下：点击右上角的 \`编辑\` 按钮，或者将一个文件拖进窗口看看吧！`
       }
     ]
   },
@@ -423,7 +453,7 @@ export function exportFileAsJson(fileId) {
 export function exportFileAsText(fileId) {
   const file = findFile(fileId)
   if (!file) return ''
-  if (file.type === 'markdown') return file.content || ''
+  if (file.type === 'markdown' || file.type === 'html') return file.content || ''
   return (file.blocks || []).map(b => {
     const title = `## ${b.title}`
     const items = (b.items || []).map(i => {

@@ -34,13 +34,13 @@
           </svg>
           大纲
         </button>
-        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
+        <button class="action-btn" v-if="(currentFile.type === 'markdown' || currentFile.type === 'html') && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
           </svg>
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
-        <template v-if="currentFile.type !== 'markdown' && (!isPwdFile || isGlobalUnlocked())">
+        <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'html' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
           <button class="action-btn" @click="toggleExpandCollapseAll" :title="isAllExpanded ? '折叠全部' : '展开全部'">
             {{ isAllExpanded ? '折叠全部' : '展开全部' }}
           </button>
@@ -113,6 +113,34 @@
         </div>
       </template>
 
+      <!-- HTML file -->
+      <template v-else-if="currentFile.type === 'html'">
+        <div class="md-wrapper" :class="{ editing: store.mdEditMode }">
+          <div class="html-preview-pane md-preview-pane" v-if="!store.mdEditMode" v-html="currentFile.content || ''"></div>
+          
+          <div class="md-edit-pane code-editor-pane" v-if="store.mdEditMode" :style="{ flex: 1 }">
+            <textarea
+              class="md-source"
+              :value="currentFile.content || ''"
+              @input="onMdInput($event.target.value)"
+              spellcheck="false"
+            ></textarea>
+          </div>
+        </div>
+      </template>
+
+      <!-- Code/Log/JSON files -->
+      <template v-else-if="currentFile.type === 'code'">
+        <div class="code-wrapper">
+          <textarea
+            class="md-source"
+            :value="currentFile.content || ''"
+            @input="onMdInput($event.target.value)"
+            spellcheck="false"
+          ></textarea>
+        </div>
+      </template>
+
       <!-- Text file with blocks -->
       <template v-else>
         <div class="content-layout">
@@ -125,8 +153,8 @@
             <!-- Block header -->
             <div class="block-header" @click="toggleBlock(block)">
               <div class="block-toggle" :class="{ collapsed: block.collapsed }">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
 
@@ -573,7 +601,7 @@ function doCollapseAll() {
 function doCopyAll() {
   if (!currentFile.value) return
   let text = ''
-  if (currentFile.value.type === 'markdown') {
+  if (currentFile.value.type === 'markdown' || currentFile.value.type === 'html' || currentFile.value.type === 'code') {
     text = currentFile.value.content || ''
   } else {
     text = (currentFile.value.blocks || []).map(b =>
@@ -751,6 +779,8 @@ defineExpose({ renamingBlockId, editingBlockId })
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 32px; border-bottom: 1px solid var(--border-light);
   min-height: 56px; flex-shrink: 0; gap: 12px;
+  position: relative;
+  z-index: 100;
 }
 .content-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .content-breadcrumb {
@@ -803,16 +833,16 @@ defineExpose({ renamingBlockId, editingBlockId })
   box-shadow: 0 -32px 0 0 var(--surface);
 }
 .block-toggle {
-  width: 18px; height: 18px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent); transition: transform 0.25s ease; flex-shrink: 0;
-  opacity: 0.6;
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); cursor: pointer; transition: transform 0.2s, color 0.15s;
+  flex-shrink: 0;
 }
+.block-toggle svg {
+  width: 14px; height: 14px;
+}
+.block-toggle:hover { color: var(--accent); }
 .block-toggle.collapsed { transform: rotate(-90deg); }
-.block-title {
-  font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 700;
-  color: var(--accent); flex: 1; letter-spacing: 0.01em;
-}
+.block-title { font-family: 'Cormorant Garamond', serif; font-size: calc(var(--app-font-size) + 2px); font-weight: 500; color: var(--text-primary); flex: 1; }
 .block-star { color: var(--accent); margin-right: 4px; }
 .block-title-input {
   flex: 1; border: none; background: var(--surface-hover);
@@ -933,6 +963,43 @@ defineExpose({ renamingBlockId, editingBlockId })
   transition: all 0.1s;
 }
 .api-copy:hover { background: var(--accent); color: white; }
+
+/* HTML Preview */
+.html-preview-pane {
+  background: #fff; color: #000;
+  padding: 24px;
+  overflow: auto;
+  position: relative;
+  z-index: 1;
+  /* 强行创建一个新的包含块，约束内部的 fixed 元素 */
+  transform: translateZ(0);
+  contain: paint layout;
+}
+.html-preview-pane :deep(*) {
+  max-width: 100%;
+}
+.code-editor-pane {
+  border-left: none;
+}
+
+/* Code/Log/JSON */
+.code-wrapper {
+  width: 100%;
+  height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+.code-wrapper .md-source {
+  flex: 1;
+  padding: 24px;
+  padding-bottom: 40px; /* 和 md-content 保持一致的底部留白 */
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
 
 /* Markdown */
 .md-wrapper {

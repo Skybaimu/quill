@@ -107,9 +107,10 @@
         <div class="uc-section">
           <div class="uc-section-title">关于</div>
           <div class="uc-about">
-            <span class="uc-version">Quill v4</span>
+            <span class="uc-version">Quill v1.5.0</span>
             <span class="uc-desc">轻量笔记工具 · Tauri + Vue 3</span>
             <span class="uc-author">作者：Sky白木</span>
+            <a href="javascript:void(0)" @click="openGithub" class="uc-github">GitHub 源码</a>
             <span class="uc-email">skybaimu@gmail.com</span>
           </div>
         </div>
@@ -120,6 +121,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { open } from '@tauri-apps/plugin-shell'
 import { store, hasGlobalPassword, removeGlobalPassword } from '../stores/useStore.js'
 
 const showPanel = ref(false)
@@ -127,6 +129,28 @@ const showPanel = ref(false)
 const userName = ref(localStorage.getItem('quill-username') || '')
 const fontSize = ref(localStorage.getItem('quill-fontsize') || 'medium')
 const theme = ref(localStorage.getItem('quill-theme') || 'light')
+
+// 监听字体大小并更新 CSS 变量
+watch(fontSize, (val) => {
+  let size = '15px'
+  if (val === 'xsmall') size = '11px'
+  else if (val === 'small') size = '13px'
+  else if (val === 'medium') size = '15px'
+  else if (val === 'large') size = '17px'
+  
+  document.documentElement.style.setProperty('--app-font-size', size)
+  localStorage.setItem('quill-fontsize', val)
+}, { immediate: true })
+
+// 监听主题并更新属性
+watch(theme, (val) => {
+  if (val === 'light') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', val)
+  }
+  localStorage.setItem('quill-theme', val)
+}, { immediate: true })
 
 const initials = computed(() => {
   if (!userName.value) return '?'
@@ -188,22 +212,35 @@ function handleDeletePassword() {
   store.lockMode = 'unlock'
   store.lockCallback = () => {
     removeGlobalPassword()
-    // 同时解锁所有文件
-    for (const catId in store.files) {
-      for (const f of store.files[catId]) {
-        f.locked = false
-      }
-    }
     showToast('已删除全局密码，所有文件已解锁')
   }
   store.lockVisible = true
 }
 
+function openGithub() {
+  open('https://github.com/skybaimu/quill')
+}
+
 function handleReset() {
   if (!confirm('确定要恢复默认数据吗？\n所有分类、文件和密码将被清除，无法恢复。')) return
+  
+  if (hasGlobalPw.value) {
+    store.lockFileId = '__global__'
+    store.lockMode = 'unlock'
+    store.lockCallback = () => {
+      executeReset()
+    }
+    store.lockVisible = true
+  } else {
+    executeReset()
+  }
+}
+
+function executeReset() {
   localStorage.removeItem('quill-data')
   localStorage.removeItem('quill-username')
   localStorage.removeItem('quill-fontsize')
+  localStorage.removeItem('quill-theme')
   location.reload()
 }
 
@@ -371,6 +408,8 @@ watch(() => store.sidebarCollapsed, (v) => {
 .uc-desc { font-size: 11px; color: var(--text-muted); }
 .uc-author { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
 .uc-email { font-size: 11px; color: var(--accent); }
+.uc-github { font-size: 11px; color: var(--accent); text-decoration: none; transition: color 0.15s; }
+.uc-github:hover { color: var(--accent-light); text-decoration: underline; }
 
 /* Password management */
 .uc-pw-actions { display: flex; flex-direction: column; gap: 4px; }

@@ -67,9 +67,9 @@
         @click="handleFileClick(file)"
         @contextmenu.prevent="openFileContext($event, file)"
         @dragstart="onFileDragStart($event, file.id)"
-        @dragover.prevent="onFileDragOver($event, file.id)"
+        @dragover.prevent.stop="onFileDragOver($event, file.id)"
         @dragleave="onFileDragLeave"
-        @drop.prevent="onFileDrop($event, file.id)"
+        @drop.prevent.stop="onFileDrop($event, file.id)"
         @dragend="onDragEnd"
       >
         <div class="file-item-top">
@@ -340,7 +340,11 @@ function onFileDragStart(e, id) {
   e.dataTransfer.effectAllowed = 'move'
   e.dataTransfer.setData('text/plain', id)
 }
-function onFileDragOver(e, id) { dragOverId.value = id }
+function onFileDragOver(e, id) {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+  dragOverId.value = id
+}
 function onFileDragLeave() { dragOverId.value = null }
 function onFileDrop(e, targetId) {
   const srcId = dragFileId.value

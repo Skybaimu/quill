@@ -5,29 +5,6 @@
       <div class="logo" v-show="!store.sidebarCollapsed">
         <span class="logo-q">q</span>uill
       </div>
-      <button class="icon-btn import-export-btn" @click="showMenu = !showMenu" title="菜单" v-show="!store.sidebarCollapsed">
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-      </button>
-      <!-- 汉堡菜单下拉 -->
-      <div class="hamburger-dropdown" v-if="showMenu" @click.stop>
-        <label class="menu-item" @click="showMenu = false">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          打开本地文件
-          <input type="file" accept=".txt,.md" @change="doOpenFile" hidden />
-        </label>
-        <div class="ctx-divider"></div>
-        <label class="menu-item" @click="showMenu = false">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          导入 JSON 备份
-          <input type="file" accept=".json" @change="doImport" hidden />
-        </label>
-        <div class="menu-item" @click="doExportAll">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          导出全部数据
-        </div>
-      </div>
       <button class="toggle-btn" @click="store.sidebarCollapsed = !store.sidebarCollapsed" :title="store.sidebarCollapsed ? '展开' : '收起'">
         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path v-if="!store.sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
@@ -42,11 +19,43 @@
       <div class="sidebar-section">
         <div class="sidebar-label">
           <span>工作空间</span>
-          <button class="icon-btn" @click="handleAddCategory" title="新建分类">
-            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-          </button>
+          <div style="display: flex; gap: 4px; position: relative;">
+            <!-- 新建分类 (加号图标) -->
+            <button class="icon-btn" @click="handleAddCategory" title="新建分类">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+            </button>
+            <!-- 导入/菜单 (文件夹图标) -->
+            <button class="icon-btn" @click.stop="showMenu = !showMenu" title="导入/菜单">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+              </svg>
+            </button>
+            
+            <!-- 菜单下拉 -->
+            <div class="hamburger-dropdown add-dropdown" v-if="showMenu" @click.stop>
+              <label class="menu-item" @click="showMenu = false">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                打开本地文件
+                <input type="file" accept=".txt,.md,.html,.htm,.json,.xml,.log,.yaml,.yml,.js,.ts,.py,.vue" @change="doOpenFile" hidden />
+              </label>
+              <div class="menu-item" @click="doOpenFolder">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                打开本地文件夹
+              </div>
+              <div class="ctx-divider"></div>
+              <label class="menu-item" @click="showMenu = false">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                导入 JSON 备份
+                <input type="file" accept=".json" @change="doImport" hidden />
+              </label>
+              <div class="menu-item" @click="doExportAll">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                导出全部数据
+              </div>
+            </div>
+          </div>
         </div>
         <div class="category-list">
           <div
@@ -63,9 +72,9 @@
             @click="selectCategory(cat.id)"
             @contextmenu.prevent="openCatContext($event, cat)"
             @dragstart="onCatDragStart($event, cat.id)"
-            @dragover.prevent="onCatDragOver($event, cat.id)"
+            @dragover.prevent.stop="onCatDragOver($event, cat.id)"
             @dragleave="onCatDragLeave"
-            @drop.prevent="onCatDrop($event, cat.id)"
+            @drop.prevent.stop="onCatDrop($event, cat.id)"
             @dragend="onDragEnd"
           >
             <div class="cat-pin" v-if="cat.pinned"></div>
@@ -143,6 +152,8 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
+import { open } from '@tauri-apps/plugin-dialog'
+import { readDir, readTextFile } from '@tauri-apps/plugin-fs'
 import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast, hasGlobalPassword, isGlobalUnlocked, unlockGlobal } from '../stores/useStore.js'
 import UserCenter from './UserCenter.vue'
 
@@ -216,6 +227,79 @@ function jumpToStarred(item) {
   })
 }
 
+async function doOpenFolder() {
+  try {
+    const dirPath = await open({
+      directory: true,
+      multiple: false,
+    })
+    
+    if (!dirPath) return
+
+    const folderName = dirPath.split(/[\\/]/).pop() || 'Imported Folder'
+    const cat = storeAddCategory()
+    cat.name = folderName
+    selectCategory(cat.id)
+
+    const entries = await readDir(dirPath)
+    let importedCount = 0
+
+    for (const entry of entries) {
+      if (entry.isFile && (entry.name.endsWith('.md') || entry.name.endsWith('.txt') || entry.name.endsWith('.html') || entry.name.endsWith('.htm') || entry.name.endsWith('.json') || entry.name.endsWith('.xml') || entry.name.endsWith('.log') || entry.name.endsWith('.yaml') || entry.name.endsWith('.yml') || entry.name.endsWith('.js') || entry.name.endsWith('.ts') || entry.name.endsWith('.py') || entry.name.endsWith('.vue'))) {
+        try {
+          const filePath = `${dirPath}/${entry.name}`
+          const text = await readTextFile(filePath)
+          
+          const newFile = storeAddFile()
+          if (newFile) {
+            newFile.name = entry.name.replace(/\.[^/.]+$/, "")
+            if (entry.name.endsWith('.md')) {
+              newFile.type = 'markdown'
+              newFile.content = text
+            } else if (entry.name.endsWith('.html') || entry.name.endsWith('.htm')) {
+              newFile.type = 'html'
+              newFile.content = text
+            } else if (entry.name.endsWith('.txt')) {
+              newFile.type = 'text'
+              newFile.blocks = [{
+                id: 'b' + Date.now() + Math.random(),
+                title: '导入内容',
+                collapsed: false,
+                starred: false,
+                order: 0,
+                items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
+              }]
+            } else {
+              newFile.type = 'code'
+              newFile.content = text
+            }
+            importedCount++
+          }
+        } catch (err) {
+          console.error(`Failed to read file ${entry.name}:`, err)
+        }
+      }
+    }
+
+    if (importedCount > 0) {
+      showToast(`已从文件夹导入 ${importedCount} 个文件`)
+    } else {
+      showToast('未找到支持的文件格式')
+      const idx = store.categories.findIndex(c => c.id === cat.id)
+      if (idx !== -1) {
+        store.categories.splice(idx, 1)
+        if (store.currentCat === cat.id) {
+          selectCategory(store.categories[0]?.id || 'c1')
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to open folder:', err)
+    showToast('打开文件夹失败')
+  }
+  showMenu.value = false
+}
+
 // Import/Export
 function doExportAll() {
   if (hasGlobalPassword() && !isGlobalUnlocked()) {
@@ -264,7 +348,10 @@ async function doOpenFile(e) {
       if (file.name.endsWith('.md')) {
         newFile.type = 'markdown'
         newFile.content = text
-      } else {
+      } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+        newFile.type = 'html'
+        newFile.content = text
+      } else if (file.name.endsWith('.txt')) {
         newFile.type = 'text'
         newFile.blocks = [{
           id: 'b' + Date.now(),
@@ -274,6 +361,9 @@ async function doOpenFile(e) {
           order: 0,
           items: [{ id: 'i' + Date.now(), label: '', text: text, type: 'text' }]
         }]
+      } else {
+        newFile.type = 'code'
+        newFile.content = text
       }
       selectFile(newFile.id)
       showToast('已打开文件: ' + file.name)
@@ -294,6 +384,8 @@ function onCatDragStart(e, id) {
 }
 
 function onCatDragOver(e, id) {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
   dragOverId.value = id
 }
 
@@ -472,6 +564,10 @@ function onDragEnd() {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
   padding: 6px; min-width: 170px;
+}
+.add-dropdown {
+  left: auto; right: 0; top: 24px;
+  font-weight: normal; text-transform: none; letter-spacing: normal;
 }
 .menu-item {
   display: flex; align-items: center; gap: 10px; padding: 9px 12px;

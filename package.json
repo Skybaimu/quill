@@ -13,6 +13,7 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-fs": "^2.5.0",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
     "marked": "^18.0.0",
