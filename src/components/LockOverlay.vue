@@ -354,11 +354,9 @@ async function endPattern() {
   verifying.value = true
   patternHint.value = '验证中...'
   patternHintType.value = ''
-  console.log(`[LockOverlay] verifying pattern... target is ${store.lockFileId}`)
   const ok = await verifyPattern(p, currentRecord.value)
   verifying.value = false
   if (ok) {
-    console.log(`[LockOverlay] pattern matched! Calling callback...`)
     patternHint.value = '验证成功'
     patternHintType.value = 'success'
     
@@ -366,7 +364,6 @@ async function endPattern() {
     if (store.lockCallback) store.lockCallback()
     close()
   } else {
-    console.log(`[LockOverlay] pattern incorrect.`)
     patternHint.value = '密码错误'
     patternHintType.value = 'error'
     if (patternWrapEl.value) patternWrapEl.value.style.animation = 'shake 0.4s'
@@ -406,17 +403,13 @@ onUnmounted(() => document.removeEventListener('keydown', handleGlobalKeydown))
 async function verifyPinUnlock() {
   if (verifying.value) return
   verifying.value = true
-  console.log(`[LockOverlay] verifying pin... target is ${store.lockFileId}`)
   const ok = await verifyPin(pinValue.value, currentRecord.value)
   verifying.value = false
   if (ok) {
-    console.log(`[LockOverlay] pin matched! Calling callback...`)
-    
     // 立刻执行回调并关闭！
     if (store.lockCallback) store.lockCallback()
     close()
   } else {
-    console.log(`[LockOverlay] pin incorrect.`)
     pinError.value = '密码错误'
     setTimeout(() => { pinValue.value = ''; pinError.value = '' }, 500)
   }

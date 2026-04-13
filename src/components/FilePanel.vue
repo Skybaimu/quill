@@ -250,32 +250,20 @@ function handleAddFile() {
 }
 
 function handleFileClick(file) {
-  console.log(`[FilePanel] clicked file: ${file.name} (id: ${file.id}), currentCat: ${store.currentCat}`)
-  
-  if (store.currentCat === 'c2') {
-    // c2 是密码类别
+  if (store.currentCat === 'c2' && isPasswordFile(file.id)) {
     if (!isGlobalUnlocked()) {
-      console.log(`[FilePanel] c2 clicked, but locked. Prompting unlock overlay.`)
-      // 不管解没解锁，都先设置 currentFile，这样右侧会显示锁定状态
-      store.currentFile = file.id
-      
       store.lockFileId = '__global__'
       store.lockMode = 'unlock'
       store.lockCallback = () => {
-        import('../stores/useStore.js').then(({ unlockGlobal }) => {
-          console.log(`[FilePanel] unlockCallback executing`)
-          unlockGlobal()
-          // 不用再调用 selectFile，直接让 Vue 响应
-          store.currentFile = file.id
-        })
+        selectFile(file.id)
       }
       store.lockVisible = true
-      return
     } else {
-      console.log(`[FilePanel] c2 clicked and already unlocked`)
+      selectFile(file.id)
     }
+  } else {
+    selectFile(file.id)
   }
-  selectFile(file.id)
 }
 
 function openFileContext(e, file) {
@@ -487,7 +475,7 @@ defineExpose({ editingFileId })
   transition: all 0.15s; margin-bottom: 2px; position: relative;
 }
 .file-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
-.file-item.active { background: var(--surface-active); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 7px; }
+.file-item.active { background: var(--accent-light); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 7px; }
 .file-item.dragging { opacity: 0.3; transform: scale(0.98); }
 .file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 5px; background: var(--accent-light); }
 

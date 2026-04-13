@@ -290,49 +290,32 @@ export function getWordCount(file) {
 
 // Actions
 export function selectCategory(id) {
-  console.log(`[Store] selectCategory called with id: ${id}`)
   store.currentCat = id
   store.filePanelCollapsed = false
   store.searchQuery = ''
   
   const files = store.files[id] || []
-  console.log(`[Store] category ${id} has ${files.length} files`)
   
   if (files.length > 0) {
-    console.log(`[Store] Auto-selecting first file: ${files[0].id}`)
-    // 直接设置 currentFile，不要走复杂的 selectFile 逻辑，这样右边就能拿到这个文件了
-    // 如果是密码类别 (c2)，ContentPanel 会根据 !isGlobalUnlocked() 自己渲染锁屏遮罩
     store.currentFile = files[0].id
     store.mdEditMode = false
   } else {
-    console.log(`[Store] Category empty, clearing currentFile`)
     store.currentFile = null
   }
 }
 
 export function selectFile(id) {
-  console.log(`[Store] selectFile called with id: ${id}`)
   const file = findFile(id)
   if (!file) {
-    console.log(`[Store] File not found`)
     return
   }
 
-  // 对于密码类别下的文件，如果未解锁则不能选中
-  const isC2 = isPasswordFile(id);
+  const isC2 = isPasswordFile(id)
 
-  console.log(`[Store] File info: isC2=${isC2}, isGlobalUnlocked=${isGlobalUnlocked()}`)
-
-  // 如果是 C2 且未解锁，由于在 FilePanel 里面已经拦截弹窗了，
-  // 理论上这里其实不应该被拦截，但为了安全起见，这里还是放行并设置 currentFile。
-  // 因为如果拦住了，右侧面板就没有 currentFile，就会显示 empty state，而不是 locked state
-  
   if (isC2 && isGlobalUnlocked()) {
-     console.log(`[Store] Global unlocked, refreshing lock timer`)
      unlockGlobal()
   }
 
-  console.log(`[Store] Setting currentFile to ${id}`)
   store.currentFile = id
   store.mdEditMode = false
 }

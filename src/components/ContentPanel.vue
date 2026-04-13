@@ -41,7 +41,7 @@
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
         <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'html' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
-          <button class="action-btn" @mousedown="handleAddBlock" title="新建内容块">
+          <button class="action-btn" @click="handleAddBlock" title="新建内容块">
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -96,7 +96,7 @@
               </li>
             </ul>
           </div>
-          <div class="md-preview-pane" @scroll="syncScroll('preview', $event)">
+          <div class="md-preview-pane" @scroll="syncScroll('preview', $event)" @click="handleMdClick">
             <div class="md-content" v-html="renderMd(currentFile.content || '')"></div>
           </div>
           <div
@@ -217,10 +217,13 @@
                       </div>
                       <textarea
                         v-else-if="editingBlockId === block.id"
+                        :key="`ta-${block.id}-${item.id}`"
+                        :id="`textarea-${block.id}`"
                         class="block-textarea"
                         v-model="item.text"
-                        @blur="saveBlockText(block, item, $event)"
-                        @input="autoGrow($event.target)"
+                        @compositionstart="isComposing = true"
+                        @compositionend="onCompositionEnd(block, $event)"
+                        @input="handleInput(block, $event)"
                         @keydown.esc="$event.target.blur()"
                         ref="blockTextareaRef"
                         spellcheck="false"
@@ -236,7 +239,7 @@
               <p>此文件中没有匹配的内容块</p>
             </div>
             <!-- Add block -->
-            <button class="add-block-btn" @mousedown="handleAddBlock" v-if="!hasQuery">
+            <button class="add-block-btn" @click="handleAddBlock" v-if="!hasQuery">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
@@ -269,11 +272,9 @@ function lockNow() {
 }
 
 function promptUnlock() {
-  console.log(`[ContentPanel] promptUnlock called`)
   store.lockFileId = '__global__'
   store.lockMode = 'unlock'
   store.lockCallback = () => {
-    console.log(`[ContentPanel] unlockCallback executing`)
     unlockGlobal()
     // 强制触发一次更新
     const cur = store.currentFile
@@ -291,6 +292,7 @@ const blockRenameRef = ref(null)
 const editingBlockId = ref(null)
 const renamingBlockId = ref(null)
 const mdEditFlex = ref(1)
+const isComposing = ref(false)
 
 const currentFile = computed(() => {
   return store.currentFile ? findFile(store.currentFile) : null
@@ -361,6 +363,7 @@ import 'highlight.js/styles/atom-one-dark.css'
 import markedKatex from 'marked-katex-extension'
 import 'katex/dist/katex.min.css'
 import markedAlert from 'marked-alert'
+import { open } from '@tauri-apps/plugin-shell'
 
 marked.use({
   gfm: true,
@@ -388,6 +391,24 @@ marked.use(markedHighlight({
 const mdTocStr = ref('[]')
 const mdToc = shallowRef([])
 const lineMap = shallowRef([])
+
+async function handleMdClick(e) {
+  const target = e.target.closest('a')
+  if (target && target.href) {
+    const href = target.getAttribute('href')
+    // If it's a local anchor link (TOC), let default behavior handle it or let scrollToHeading handle it
+    if (href && href.startsWith('#')) return
+    
+    // Otherwise, it's an external link
+    e.preventDefault()
+    try {
+      await open(target.href)
+    } catch (err) {
+      console.error('Failed to open link:', err)
+      window.open(target.href, '_blank') // fallback
+    }
+  }
+}
 
 const renderer = new marked.Renderer()
 // Helper to extract the token line number before rendering
@@ -668,24 +689,32 @@ function copyText(text, label) {
 }
 
 function handleAddBlock() {
+  // We use @click on the add buttons so the browser natively blurs the current textarea
+  // and completely flushes any IME composition BEFORE this function even runs.
+  
+  if (editingBlockId.value) {
+    editingBlockId.value = null
+  }
+  
   const block = storeAddBlock()
   if (!block) return
+  
   nextTick(() => {
     editingBlockId.value = block.id
-    setTimeout(() => {
-      const ta = contentBodyRef.value?.querySelector('.block-textarea')
+    nextTick(() => {
+      const ta = document.getElementById(`textarea-${block.id}`)
       if (ta) {
         ta.focus()
         ta.style.height = '120px'
       }
-    }, 50)
+    })
   })
 }
 
 function startEdit(block) {
   editingBlockId.value = block.id
   nextTick(() => {
-    const ta = contentBodyRef.value?.querySelector('.block-textarea')
+    const ta = document.getElementById(`textarea-${block.id}`)
     if (ta) {
       ta.focus()
       ta.style.height = Math.max(120, ta.scrollHeight) + 'px'
@@ -694,17 +723,45 @@ function startEdit(block) {
   })
 }
 
-function saveBlockText(block, item, e) {
-  item.text = e.target.value
-  if (currentFile.value) currentFile.value.updatedAt = Date.now()
-  if (editingBlockId.value === block.id) {
-    editingBlockId.value = null
-  }
-}
-
 function autoGrow(el) {
   el.style.height = 'auto'
   el.style.height = Math.max(120, el.scrollHeight) + 'px'
+}
+
+function onCompositionEnd(block, e) {
+  isComposing.value = false
+  // 拼音组合输入完成后，手动触发一次标题更新
+  updateTitleIfDefault(block, e.target.value)
+}
+
+function updateTitleIfDefault(block, text) {
+  if (!block) return
+  
+  const val = text.trim()
+  if (!val) return
+
+  // Check if it's a default title OR if the current title is exactly the prefix of the current text
+  // (which means it was auto-generated from this text previously)
+  const isDefaultTitle = /^标题\s*\d+$/.test(block.title)
+  const isAutoGeneratedTitle = block.title === (val.length > 10 ? val.substring(0, 10) + '...' : val) || 
+                               val.startsWith(block.title.replace('...', ''))
+
+  if (isDefaultTitle || isAutoGeneratedTitle) {
+    block.title = val.length > 10 ? val.substring(0, 10) + '...' : val
+  }
+}
+
+function handleInput(block, e) {
+  autoGrow(e.target)
+  
+  // Auto-update title if it's still a default title, but skip if using IME (Chinese Pinyin)
+  if (!isComposing.value) {
+    updateTitleIfDefault(block, e.target.value)
+  }
+
+  if (currentFile.value) {
+    currentFile.value.updatedAt = Date.now()
+  }
 }
 
 function startBlockRename(block) {
