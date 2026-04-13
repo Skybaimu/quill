@@ -107,7 +107,7 @@
         <div class="uc-section">
           <div class="uc-section-title">关于</div>
           <div class="uc-about">
-            <span class="uc-version">Quill v1.5.0</span>
+            <span class="uc-version">Quill v1.6.0</span>
             <span class="uc-desc">轻量笔记工具 · Tauri + Vue 3</span>
             <span class="uc-author">作者：Sky白木</span>
             <a href="javascript:void(0)" @click="openGithub" class="uc-github">GitHub 源码</a>

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Quill",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "identifier": "com.skybaimu.quill",
   "build": {
     "frontendDist": "../dist",
@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Quill",
-        "width": 800,
-        "height": 600,
+        "width": 1100,
+        "height": 800,
         "resizable": true,
         "fullscreen": false
       }

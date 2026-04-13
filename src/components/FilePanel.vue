@@ -7,12 +7,12 @@
         </div>
         <div class="file-panel-actions">
           <button class="icon-btn" @click="handleAddFile" title="新建文件">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
           </button>
           <button class="icon-btn" @click="store.filePanelCollapsed = true" title="收起文件列表">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7"/>
             </svg>
           </button>
@@ -481,15 +481,15 @@ defineExpose({ editingFileId })
 .search-clear:hover { color: var(--text-primary); background: var(--surface-hover); }
 
 /* File list */
-.file-list { flex: 1; overflow-y: auto; padding: 8px; }
+.file-list { flex: 1; overflow-y: auto; padding: 6px; }
 .file-item {
-  padding: 12px 14px; border-radius: var(--radius); cursor: pointer;
+  padding: 8px 10px; border-radius: var(--radius); cursor: pointer;
   transition: all 0.15s; margin-bottom: 2px; position: relative;
 }
 .file-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
-.file-item.active { background: var(--accent-light); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 11px; }
+.file-item.active { background: var(--surface-active); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 7px; }
 .file-item.dragging { opacity: 0.3; transform: scale(0.98); }
-.file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 9px; background: var(--accent-light); }
+.file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 5px; background: var(--accent-light); }
 
 .file-item-top { display: flex; align-items: flex-start; gap: 4px; }
 .file-name {
@@ -527,7 +527,7 @@ defineExpose({ editingFileId })
   overflow: hidden; text-overflow: ellipsis; margin-top: 4px;
 }
 .file-meta {
-  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  display: flex; align-items: center; gap: 8px; margin-top: 4px;
   font-size: 11px; color: var(--text-muted);
 }
 .file-tag { padding: 2px 8px; background: var(--accent-light); color: var(--accent); border-radius: 4px; font-size: 10px; font-weight: 500; }
@@ -555,12 +555,12 @@ defineExpose({ editingFileId })
 }
 .add-file-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; padding: 10px; border: 1px dashed var(--border);
-  background: transparent; color: var(--text-muted); border-radius: var(--radius);
+  width: 100%; padding: 16px 10px; border: none; border-top: 1px dashed var(--border);
+  background: transparent; color: var(--text-muted); border-radius: 0;
   cursor: pointer; font-family: inherit; font-size: 13px; transition: all 0.2s;
 }
 .add-file-btn:hover {
-  border-color: var(--accent); color: var(--accent); background: var(--accent-light);
+  color: var(--accent);
 }
 
 /* Export menu */

@@ -41,6 +41,11 @@
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
         <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'html' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
+          <button class="action-btn" @mousedown="handleAddBlock" title="新建内容块">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+          </button>
           <button class="action-btn" @click="toggleExpandCollapseAll" :title="isAllExpanded ? '折叠全部' : '展开全部'">
             {{ isAllExpanded ? '折叠全部' : '展开全部' }}
           </button>
@@ -162,13 +167,14 @@
                 <template v-if="renamingBlockId === block.id">
                   <input
                     class="block-title-input"
-                    :value="block.title"
+                    v-model="block.title"
                     @blur="finishBlockRename(block, $event)"
                     @keydown.enter="$event.target.blur()"
                     @keydown.escape="renamingBlockId = null"
                     @click.stop
                     ref="blockRenameRef"
                     autofocus
+                    spellcheck="false"
                   />
                 </template>
                 <template v-else>
@@ -210,9 +216,9 @@
                         <span v-else>{{ item.text || '' }}</span>
                       </div>
                       <textarea
-                        v-else
+                        v-else-if="editingBlockId === block.id"
                         class="block-textarea"
-                        :value="item.text"
+                        v-model="item.text"
                         @blur="saveBlockText(block, item, $event)"
                         @input="autoGrow($event.target)"
                         @keydown.esc="$event.target.blur()"
@@ -229,11 +235,8 @@
             <div class="search-no-blocks" v-if="hasQuery && visibleBlocks.length === 0 && currentFile">
               <p>此文件中没有匹配的内容块</p>
             </div>
-          </div>
-
-          <!-- Add block (Sticky at bottom of layout) -->
-          <div class="add-block-container" v-if="!hasQuery">
-            <button class="add-block-btn" @click="handleAddBlock">
+            <!-- Add block -->
+            <button class="add-block-btn" @mousedown="handleAddBlock" v-if="!hasQuery">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
@@ -669,13 +672,13 @@ function handleAddBlock() {
   if (!block) return
   nextTick(() => {
     editingBlockId.value = block.id
-    nextTick(() => {
+    setTimeout(() => {
       const ta = contentBodyRef.value?.querySelector('.block-textarea')
       if (ta) {
         ta.focus()
         ta.style.height = '120px'
       }
-    })
+    }, 50)
   })
 }
 
@@ -694,7 +697,9 @@ function startEdit(block) {
 function saveBlockText(block, item, e) {
   item.text = e.target.value
   if (currentFile.value) currentFile.value.updatedAt = Date.now()
-  editingBlockId.value = null
+  if (editingBlockId.value === block.id) {
+    editingBlockId.value = null
+  }
 }
 
 function autoGrow(el) {
@@ -882,10 +887,10 @@ defineExpose({ renamingBlockId, editingBlockId })
 
 /* Content body */
 .content-body {
-  flex: 1; overflow-y: auto; padding: 32px 40px 200px;
+  flex: 1; overflow-y: auto; padding: 0 40px; display: flex; flex-direction: column;
 }
-.content-layout { width: 100%; height: 100%; display: flex; flex-direction: column; }
-.blocks-container { flex: 1; }
+.content-layout { width: 100%; display: flex; flex-direction: column; flex: 1; padding: 32px 0 0 0; }
+.blocks-container { flex: 1; display: flex; flex-direction: column; }
 
 /* Blocks */
 .content-block {
