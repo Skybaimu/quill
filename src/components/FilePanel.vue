@@ -2,15 +2,17 @@
   <div class="file-panel" :class="{ hidden: store.filePanelCollapsed }">
     <div class="file-panel-header">
       <div class="file-panel-top">
-        <div class="file-panel-title">{{ currentCatName }}</div>
+        <div class="file-panel-title">
+          {{ currentCatName }}
+        </div>
         <div class="file-panel-actions">
           <button class="icon-btn" @click="handleAddFile" title="新建文件">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
           </button>
           <button class="icon-btn" @click="store.filePanelCollapsed = true" title="收起文件列表">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7"/>
             </svg>
           </button>
@@ -107,7 +109,6 @@
             </svg>
           </button>
         </div>
-        <div class="file-preview" v-html="getFilePreviewHtml(file)"></div>
         <div class="file-meta">
           <span class="file-tag" :class="'tag-' + file.tag?.toLowerCase()">{{ file.tag }}</span>
           <span v-if="file.locked" class="file-lock">🔒</span>
@@ -124,6 +125,16 @@
           <p>此分类暂无文件</p>
           <button class="empty-add-btn" @click="handleAddFile">创建文件</button>
         </template>
+      </div>
+
+      <!-- 底部添加文件按钮 -->
+      <div class="file-list-bottom" v-if="filteredFiles.length > 0 && !store.searchQuery">
+        <button class="add-file-btn" @click="handleAddFile">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          新建文件
+        </button>
       </div>
     </div>
 
@@ -408,10 +419,13 @@ defineExpose({ editingFileId })
 
 .file-panel-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
 .file-panel-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.file-panel-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-panel-title { 
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+}
 .file-panel-actions { display: flex; gap: 4px; }
 .icon-btn {
-  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 6px; transition: all 0.15s;
 }
@@ -473,7 +487,7 @@ defineExpose({ editingFileId })
   transition: all 0.15s; margin-bottom: 2px; position: relative;
 }
 .file-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
-.file-item.active { background: var(--surface); box-shadow: var(--shadow-md); }
+.file-item.active { background: var(--accent-light); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 11px; }
 .file-item.dragging { opacity: 0.3; transform: scale(0.98); }
 .file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 9px; background: var(--accent-light); }
 
@@ -533,6 +547,21 @@ defineExpose({ editingFileId })
   font-size: 12px; color: var(--text-secondary); transition: all 0.15s;
 }
 .empty-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.file-list-bottom {
+  padding: 8px 0;
+  display: flex;
+  justify-content: center;
+}
+.add-file-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 10px; border: 1px dashed var(--border);
+  background: transparent; color: var(--text-muted); border-radius: var(--radius);
+  cursor: pointer; font-family: inherit; font-size: 13px; transition: all 0.2s;
+}
+.add-file-btn:hover {
+  border-color: var(--accent); color: var(--accent); background: var(--accent-light);
+}
 
 /* Export menu */
 .export-overlay { position: fixed; inset: 0; z-index: 500; }

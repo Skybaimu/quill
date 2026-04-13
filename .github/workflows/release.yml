@@ -15,7 +15,7 @@ jobs:
         # 矩阵构建：同时在 Mac 和 Windows 上运行
         include:
           - platform: 'macos-latest' # macOS 最新版本
-            args: '--target universal-apple-darwin'
+            args: ''
           - platform: 'windows-latest' # Windows x64
             args: ''
 
@@ -33,7 +33,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.platform == 'macos-latest' && 'x86_64-apple-darwin,aarch64-apple-darwin' || '' }}
 
       # Ubuntu/Linux 如果后续需要支持，在这里安装相关系统依赖
       # - name: Install dependencies (ubuntu only)

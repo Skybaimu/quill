@@ -23,9 +23,22 @@
       "csp": null
     }
   },
+  "plugins": {
+    "cli": {
+      "description": "Quill CLI interface",
+      "args": [
+        {
+          "name": "file",
+          "index": 1,
+          "takesValue": true,
+          "multiple": false
+        }
+      ]
+    }
+  },
   "bundle": {
     "active": true,
-    "targets": "nsis",
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -53,6 +66,9 @@
         "displayLanguageSelector": false
       },
       "wix": null
+    },
+    "macOS": {
+      "exceptionDomain": ""
     }
   }
 }

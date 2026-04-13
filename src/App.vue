@@ -16,6 +16,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { stat, readDir, readTextFile } from '@tauri-apps/plugin-fs'
+import { getMatches } from '@tauri-apps/plugin-cli'
 import Sidebar from './components/Sidebar.vue'
 import FilePanel from './components/FilePanel.vue'
 import ContentPanel from './components/ContentPanel.vue'
@@ -33,6 +34,44 @@ const appClasses = computed(() => ({
 }))
 
 onMounted(async () => {
+  // Check CLI arguments for files opened externally
+  try {
+    const matches = await getMatches()
+    if (matches.args && matches.args.file && matches.args.file.value) {
+      const path = matches.args.file.value
+      const fileName = path.split(/[\\/]/).pop()
+      const text = await readTextFile(path)
+      
+      const newFile = addFile()
+      if (newFile) {
+        newFile.name = fileName.replace(/\.[^/.]+$/, "")
+        if (fileName.endsWith('.md') || fileName.endsWith('.markdown')) {
+          newFile.type = 'markdown'
+          newFile.content = text
+        } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+          newFile.type = 'html'
+          newFile.content = text
+        } else if (fileName.endsWith('.txt')) {
+          newFile.type = 'text'
+          newFile.blocks = [{
+            id: 'b' + Date.now() + Math.random(),
+            title: '导入内容',
+            collapsed: false,
+            starred: false,
+            order: 0,
+            items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
+          }]
+        } else {
+          newFile.type = 'code'
+          newFile.content = text
+        }
+        selectFile(newFile.id)
+      }
+    }
+  } catch (err) {
+    console.error('Failed to parse CLI arguments:', err)
+  }
+
   // Listen for native file drops via Tauri
   listen('tauri://drag-drop', async (event) => {
     const paths = event.payload.paths

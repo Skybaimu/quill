@@ -18,17 +18,17 @@
       <!-- Workspace section -->
       <div class="sidebar-section">
         <div class="sidebar-label">
-          <span>工作空间</span>
+          <span>类别</span>
           <div style="display: flex; gap: 4px; position: relative;">
             <!-- 新建分类 (加号图标) -->
-            <button class="icon-btn" @click="handleAddCategory" title="新建分类">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="icon-btn sidebar-icon-btn" @click="handleAddCategory" title="新建分类">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
             </button>
             <!-- 导入/菜单 (文件夹图标) -->
-            <button class="icon-btn" @click.stop="showMenu = !showMenu" title="导入/菜单">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="icon-btn sidebar-icon-btn" @click.stop="showMenu = !showMenu" title="导入/菜单">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
               </svg>
             </button>
@@ -501,6 +501,9 @@ function onDragEnd() {
   display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
   color: var(--text-muted); border-radius: 4px; transition: all 0.15s;
+}
+.sidebar-icon-btn {
+  width: 24px; height: 24px;
 }
 .icon-btn:hover { background: var(--accent-light); color: var(--accent); }
 
