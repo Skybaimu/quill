@@ -33,44 +33,64 @@ const appClasses = computed(() => ({
   'filepanel-collapsed': store.filePanelCollapsed
 }))
 
+async function openFileFromPath(path) {
+  try {
+    const fileName = path.split(/[\\/]/).pop()
+    const text = await readTextFile(path)
+    
+    const newFile = addFile()
+    if (newFile) {
+      newFile.name = fileName.replace(/\.[^/.]+$/, "")
+      if (fileName.endsWith('.md') || fileName.endsWith('.markdown')) {
+        newFile.type = 'markdown'
+        newFile.content = text
+      } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+        newFile.type = 'html'
+        newFile.content = text
+      } else if (fileName.endsWith('.txt')) {
+        newFile.type = 'text'
+        newFile.blocks = [{
+          id: 'b' + Date.now() + Math.random(),
+          title: '导入内容',
+          collapsed: false,
+          starred: false,
+          order: 0,
+          items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
+        }]
+      } else {
+        newFile.type = 'code'
+        newFile.content = text
+      }
+      selectFile(newFile.id)
+    }
+  } catch (err) {
+    console.error('Failed to open file from path:', err)
+  }
+}
+
 onMounted(async () => {
   // Check CLI arguments for files opened externally
   try {
     const matches = await getMatches()
     if (matches.args && matches.args.file && matches.args.file.value) {
-      const path = matches.args.file.value
-      const fileName = path.split(/[\\/]/).pop()
-      const text = await readTextFile(path)
-      
-      const newFile = addFile()
-      if (newFile) {
-        newFile.name = fileName.replace(/\.[^/.]+$/, "")
-        if (fileName.endsWith('.md') || fileName.endsWith('.markdown')) {
-          newFile.type = 'markdown'
-          newFile.content = text
-        } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-          newFile.type = 'html'
-          newFile.content = text
-        } else if (fileName.endsWith('.txt')) {
-          newFile.type = 'text'
-          newFile.blocks = [{
-            id: 'b' + Date.now() + Math.random(),
-            title: '导入内容',
-            collapsed: false,
-            starred: false,
-            order: 0,
-            items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
-          }]
-        } else {
-          newFile.type = 'code'
-          newFile.content = text
-        }
-        selectFile(newFile.id)
-      }
+      await openFileFromPath(matches.args.file.value)
     }
   } catch (err) {
     console.error('Failed to parse CLI arguments:', err)
   }
+
+  // Listen for single instance event (when user double-clicks another .md file while app is running)
+  listen('single-instance', async (event) => {
+    const args = event.payload
+    // The arguments are usually: [ "path/to/quill.exe", "path/to/file.md" ]
+    if (args && args.length > 1) {
+      const filePath = args[args.length - 1]
+      // Quick check if it looks like a file path
+      if (filePath && !filePath.startsWith('--') && (filePath.includes('\\') || filePath.includes('/'))) {
+        await openFileFromPath(filePath)
+      }
+    }
+  })
 
   // Listen for native file drops via Tauri
   listen('tauri://drag-drop', async (event) => {
