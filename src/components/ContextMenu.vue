@@ -110,8 +110,17 @@ function doAction(act) {
         break
       case 'export':
         const text = exportFileAsText(target)
-        const ext = file.type === 'markdown' ? '.md' : '.txt'
-        downloadFile(text, file.name + ext)
+        let ext = '.txt'
+        if (file.type === 'markdown') {
+          ext = '.md'
+        } else if (file.type === 'code') {
+          // If the file name already has a recognized extension, use it. Otherwise default to .txt
+          const parts = file.name.split('.')
+          if (parts.length > 1) {
+            ext = '.' + parts.pop()
+          }
+        }
+        downloadFile(text, file.name + (file.name.endsWith(ext) ? '' : ext))
         showToast('已导出')
         break
       case 'delete':

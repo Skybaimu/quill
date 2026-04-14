@@ -40,12 +40,10 @@ async function openFileFromPath(path) {
     
     const newFile = addFile()
     if (newFile) {
-      newFile.name = fileName.replace(/\.[^/.]+$/, "")
+      newFile.name = fileName // Keep the extension for syntax highlighting
       if (fileName.endsWith('.md') || fileName.endsWith('.markdown')) {
         newFile.type = 'markdown'
-        newFile.content = text
-      } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-        newFile.type = 'html'
+        delete newFile.blocks
         newFile.content = text
       } else if (fileName.endsWith('.txt')) {
         newFile.type = 'text'
@@ -59,6 +57,7 @@ async function openFileFromPath(path) {
         }]
       } else {
         newFile.type = 'code'
+        delete newFile.blocks
         newFile.content = text
       }
       selectFile(newFile.id)
@@ -117,12 +116,10 @@ onMounted(async () => {
                 const text = await readTextFile(`${path}/${entry.name}`)
                 const newFile = addFile()
                 if (newFile) {
-                  newFile.name = entry.name.replace(/\.[^/.]+$/, "")
+                  newFile.name = entry.name // Keep extension
                   if (entry.name.endsWith('.md')) {
                     newFile.type = 'markdown'
-                    newFile.content = text
-                  } else if (entry.name.endsWith('.html') || entry.name.endsWith('.htm')) {
-                    newFile.type = 'html'
+                    delete newFile.blocks
                     newFile.content = text
                   } else if (entry.name.endsWith('.txt')) {
                     newFile.type = 'text'
@@ -136,6 +133,7 @@ onMounted(async () => {
                     }]
                   } else {
                     newFile.type = 'code'
+                    delete newFile.blocks
                     newFile.content = text
                   }
                   importedCount++
@@ -152,12 +150,10 @@ onMounted(async () => {
             const text = await readTextFile(path)
             const newFile = addFile()
             if (newFile) {
-              newFile.name = fileName.replace(/\.[^/.]+$/, "")
+              newFile.name = fileName // Keep extension
               if (fileName.endsWith('.md')) {
                 newFile.type = 'markdown'
-                newFile.content = text
-              } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-                newFile.type = 'html'
+                delete newFile.blocks
                 newFile.content = text
               } else if (fileName.endsWith('.txt')) {
                 newFile.type = 'text'
@@ -171,6 +167,7 @@ onMounted(async () => {
                 }]
               } else {
                 newFile.type = 'code'
+                delete newFile.blocks
                 newFile.content = text
               }
               selectFile(newFile.id)

@@ -34,13 +34,13 @@
           </svg>
           大纲
         </button>
-        <button class="action-btn" v-if="(currentFile.type === 'markdown' || currentFile.type === 'html') && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
+        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
           </svg>
           {{ store.mdEditMode ? '预览' : '编辑' }}
         </button>
-        <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'html' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
+        <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
           <button class="action-btn" @click="handleAddBlock" title="新建内容块">
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -50,6 +50,9 @@
             {{ isAllExpanded ? '折叠全部' : '展开全部' }}
           </button>
         </template>
+        <button class="action-btn" v-if="(currentFile.type === 'code' || currentFile.type === 'markdown') && (!isPwdFile || isGlobalUnlocked())" @click="doExportFile" title="导出此文件">
+          导出
+        </button>
         <button class="action-btn primary" v-if="!isPwdFile || isGlobalUnlocked()" @click="doCopyAll">
           复制全部
         </button>
@@ -118,31 +121,23 @@
         </div>
       </template>
 
-      <!-- HTML file -->
-      <template v-else-if="currentFile.type === 'html'">
-        <div class="md-wrapper" :class="{ editing: store.mdEditMode }">
-          <div class="html-preview-pane md-preview-pane" v-if="!store.mdEditMode" v-html="currentFile.content || ''"></div>
-          
-          <div class="md-edit-pane code-editor-pane" v-if="store.mdEditMode" :style="{ flex: 1 }">
+      <!-- Code/Log/JSON/HTML files -->
+      <template v-else-if="currentFile.type === 'code'">
+        <div class="code-wrapper">
+          <div class="code-editor-container">
+            <!-- Syntax highlighted background -->
+            <pre class="code-highlight-bg"><code class="hljs" v-html="highlightedCode"></code></pre>
+            
+            <!-- Transparent textarea for editing -->
             <textarea
-              class="md-source"
+              class="code-textarea"
               :value="currentFile.content || ''"
               @input="onMdInput($event.target.value)"
+              @scroll="syncCodeScroll"
+              ref="codeTextareaRef"
               spellcheck="false"
             ></textarea>
           </div>
-        </div>
-      </template>
-
-      <!-- Code/Log/JSON files -->
-      <template v-else-if="currentFile.type === 'code'">
-        <div class="code-wrapper">
-          <textarea
-            class="md-source"
-            :value="currentFile.content || ''"
-            @input="onMdInput($event.target.value)"
-            spellcheck="false"
-          ></textarea>
         </div>
       </template>
 
@@ -263,7 +258,8 @@ import {
   store, findFile, getCurrentCat, addBlock as storeAddBlock, deleteBlock,
   addFile as storeAddFile, selectFile as storeSelectFile,
   highlightText, blockMatchesQuery, formatTime, showToast,
-  isGlobalUnlocked, lockGlobal, unlockGlobal, isPasswordFile
+  isGlobalUnlocked, lockGlobal, unlockGlobal, isPasswordFile,
+  exportFileAsText, downloadFile
 } from '../stores/useStore.js'
 
 function lockNow() {
@@ -386,6 +382,58 @@ marked.use(markedHighlight({
     return hljs.highlight(code, { language }).value
   }
 }))
+
+const codeTextareaRef = ref(null)
+
+function syncCodeScroll(e) {
+  const bg = e.target.previousElementSibling
+  if (bg) {
+    bg.scrollTop = e.target.scrollTop
+    bg.scrollLeft = e.target.scrollLeft
+  }
+}
+
+const highlightedCode = computed(() => {
+  if (!currentFile.value || currentFile.value.type !== 'code') return ''
+  // 必须在最后加一个换行符，否则如果最后一行没有回车，textarea 和 pre 的高度对不齐
+  const code = (currentFile.value.content || '') + '\n'
+  const ext = currentFile.value.name?.split('.').pop()?.toLowerCase() || ''
+  
+  // Try to detect language based on file extension
+  let language = 'plaintext'
+  if (['html', 'htm', 'xml'].includes(ext)) language = 'html'
+  else if (['js', 'jsx'].includes(ext)) language = 'javascript'
+  else if (['ts', 'tsx'].includes(ext)) language = 'typescript'
+  else if (['json'].includes(ext)) language = 'json'
+  else if (['css', 'scss', 'less'].includes(ext)) language = 'css'
+  else if (['py'].includes(ext)) language = 'python'
+  else if (['java'].includes(ext)) language = 'java'
+  else if (['cpp', 'c', 'h'].includes(ext)) language = 'cpp'
+  else if (['rs'].includes(ext)) language = 'rust'
+  else if (['go'].includes(ext)) language = 'go'
+  else if (['sh', 'bash', 'zsh'].includes(ext)) language = 'bash'
+  else if (['sql'].includes(ext)) language = 'sql'
+  else if (['yaml', 'yml'].includes(ext)) language = 'yaml'
+
+  try {
+    const hlLang = language === 'html' ? 'xml' : language;
+    console.log(`[DEBUG Highlight] File: ${currentFile.value.name}, Ext: ${ext}, Language: ${language}, hlLang: ${hlLang}`);
+    const isLangLoaded = !!hljs.getLanguage(hlLang);
+    console.log(`[DEBUG Highlight] Is '${hlLang}' loaded in highlight.js? ${isLangLoaded}`);
+    
+    if (language !== 'plaintext' && isLangLoaded) {
+      const res = hljs.highlight(code, { language: hlLang }).value;
+      console.log(`[DEBUG Highlight] Highlight successful. Output length: ${res.length}`);
+      return res;
+    }
+    // Fallback to simple escaping for unsupported languages.
+    console.log(`[DEBUG Highlight] Falling back to escaping. (isPlaintext: ${language === 'plaintext'}, isLangLoaded: ${isLangLoaded})`);
+    return code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  } catch (e) {
+    console.error('[DEBUG Highlight] Highlight error:', e)
+    return code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+})
 
 // Markdown rendering
 const mdTocStr = ref('[]')
@@ -676,6 +724,24 @@ function doCopyAll() {
     ).filter(s => s.length > 10).join('\n\n')
   }
   navigator.clipboard?.writeText(text).then(() => showToast('已复制全部')).catch(() => showToast('复制失败'))
+}
+
+function doExportFile() {
+  if (!currentFile.value) return
+  const file = currentFile.value
+  const text = exportFileAsText(file.id)
+  
+  let ext = '.txt'
+  if (file.type === 'markdown') {
+    ext = '.md'
+  } else if (file.type === 'code') {
+    const parts = file.name.split('.')
+    if (parts.length > 1) {
+      ext = '.' + parts.pop()
+    }
+  }
+  
+  downloadFile(text, file.name + (file.name.endsWith(ext) ? '' : ext))
 }
 
 function copyBlock(block) {

@@ -148,3 +148,70 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Code Editor with Syntax Highlighting Overlay */
+.code-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background-color: #282c34; /* Match atom-one-dark background */
+}
+
+.code-editor-container {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.code-highlight-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 16px;
+  overflow: hidden; /* Hide scrollbars, let textarea manage scrolling */
+  pointer-events: none; /* Pass clicks through to textarea */
+}
+
+.code-highlight-bg code {
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  display: block;
+  padding: 0 !important; /* Reset highlight.js default padding */
+  background: transparent !important; /* Reset highlight.js default background */
+}
+
+.code-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  margin: 0;
+  border: none;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent; /* Hide actual text, show only caret */
+  caret-color: #fff;  /* Make cursor visible on dark background */
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  z-index: 1;
+}
+
+.code-textarea::selection {
+  background: rgba(255, 255, 255, 0.2);
+  color: transparent;
+}

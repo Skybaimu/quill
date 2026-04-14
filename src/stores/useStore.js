@@ -189,11 +189,15 @@ export function lockGlobal() {
 }
 
 // Auto-save to localStorage
+let saveTimeout = null
 watch(() => {
   const { categories, files, passwords } = store
   return { categories, files, passwords }
 }, (val) => {
-  localStorage.setItem('quill-data', JSON.stringify(val))
+  if (saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(() => {
+    localStorage.setItem('quill-data', JSON.stringify(val))
+  }, 1000)
 }, { deep: true })
 
 // Computed helpers
@@ -362,6 +366,8 @@ export function addFile() {
     locked: false,
     type: isMd ? 'markdown' : 'text',
     updatedAt: Date.now(),
+    // Both markdown and code/html types use content string, while text uses blocks array.
+    // By default, a new file gets the structure matching its initial type.
     ...(isMd ? { content: '' } : {
       blocks: [{
         id: 'b' + uid(),
@@ -461,7 +467,7 @@ export function exportFileAsJson(fileId) {
 export function exportFileAsText(fileId) {
   const file = findFile(fileId)
   if (!file) return ''
-  if (file.type === 'markdown' || file.type === 'html') return file.content || ''
+  if (file.type === 'markdown' || file.type === 'html' || file.type === 'code') return file.content || ''
   return (file.blocks || []).map(b => {
     const title = `## ${b.title}`
     const items = (b.items || []).map(i => {

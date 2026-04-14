@@ -280,12 +280,10 @@ async function doOpenFolder() {
           
           const newFile = storeAddFile()
           if (newFile) {
-            newFile.name = entry.name.replace(/\.[^/.]+$/, "")
+            newFile.name = entry.name // Keep extension
             if (entry.name.endsWith('.md')) {
               newFile.type = 'markdown'
-              newFile.content = text
-            } else if (entry.name.endsWith('.html') || entry.name.endsWith('.htm')) {
-              newFile.type = 'html'
+              delete newFile.blocks
               newFile.content = text
             } else if (entry.name.endsWith('.txt')) {
               newFile.type = 'text'
@@ -299,6 +297,7 @@ async function doOpenFolder() {
               }]
             } else {
               newFile.type = 'code'
+              delete newFile.blocks
               newFile.content = text
             }
             importedCount++
@@ -372,12 +371,10 @@ async function doOpenFile(e) {
     const text = await readFileAsText(file)
     const newFile = storeAddFile()
     if (newFile) {
-      newFile.name = file.name.replace(/\.[^/.]+$/, "") // Remove extension
+      newFile.name = file.name // Keep extension
       if (file.name.endsWith('.md')) {
         newFile.type = 'markdown'
-        newFile.content = text
-      } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
-        newFile.type = 'html'
+        delete newFile.blocks
         newFile.content = text
       } else if (file.name.endsWith('.txt')) {
         newFile.type = 'text'
@@ -391,6 +388,7 @@ async function doOpenFile(e) {
         }]
       } else {
         newFile.type = 'code'
+        delete newFile.blocks
         newFile.content = text
       }
       selectFile(newFile.id)
