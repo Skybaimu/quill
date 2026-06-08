@@ -56,6 +56,7 @@
     </div>
 
     <div class="file-list" @click="scopeOpen = false">
+      <TransitionGroup name="file-list">
       <div
         v-for="file in filteredFiles"
         :key="file.id"
@@ -116,6 +117,7 @@
           <span class="file-time" v-if="file.updatedAt">{{ getFileTime(file) }}</span>
         </div>
       </div>
+      </TransitionGroup>
 
       <div class="file-empty" v-if="filteredFiles.length === 0">
         <template v-if="store.searchQuery">
@@ -165,8 +167,10 @@ import {
   addFile as storeAddFile, getCurrentCat,
   highlightText, formatTime, showToast,
   exportFileAsText, exportFileAsJson, downloadFile,
-  isGlobalUnlocked, isPasswordFile, unlockGlobal
+  isGlobalUnlocked, isPasswordFile, unlockGlobal,
+  reorderFile as storeReorderFile
 } from '../stores/useStore.js'
+import { logger } from '../utils/logger.js'
 
 const scopes = [
   { key: 'file', label: '文件' },
@@ -178,6 +182,7 @@ const editingFileId = ref(null)
 const fileRenameInput = ref(null)
 const dragFileId = ref(null)
 const dragOverId = ref(null)
+const dragLeaveTimer = ref(null)
 const scopeOpen = ref(false)
 
 // Export menu
@@ -359,35 +364,49 @@ function doExport(format) {
   }
 }
 
-// Drag & drop
+// Drag & drop（插入式排序 + 跨分类拖到侧栏）
 function onFileDragStart(e, id) {
   dragFileId.value = id
   e.target.classList.add('dragging')
   e.dataTransfer.effectAllowed = 'move'
   e.dataTransfer.setData('text/plain', id)
+  // 同时设置 file 类型标记，让侧栏知道拖的是文件
+  e.dataTransfer.setData('application/x-quill-file', id)
+  logger.info('FilePanel', '文件拖拽开始', { id })
 }
 function onFileDragOver(e, id) {
   e.preventDefault()
   e.dataTransfer.dropEffect = 'move'
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
   dragOverId.value = id
 }
-function onFileDragLeave() { dragOverId.value = null }
+function onFileDragLeave() {
+  if (dragLeaveTimer.value) clearTimeout(dragLeaveTimer.value)
+  dragLeaveTimer.value = setTimeout(() => {
+    dragOverId.value = null
+    dragLeaveTimer.value = null
+  }, 50)
+}
 function onFileDrop(e, targetId) {
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
   const srcId = dragFileId.value
   if (srcId && srcId !== targetId) {
-    const files = store.files[store.currentCat] || []
-    const src = files.find(f => f.id === srcId)
-    const dst = files.find(f => f.id === targetId)
-    if (src && dst) {
-      const tmp = src.order
-      src.order = dst.order
-      dst.order = tmp
-    }
+    storeReorderFile(srcId, targetId)
   }
   dragOverId.value = null
   dragFileId.value = null
 }
 function onDragEnd() {
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
   dragFileId.value = null
   dragOverId.value = null
   document.querySelectorAll('.file-item').forEach(el => el.classList.remove('dragging'))
@@ -470,15 +489,32 @@ defineExpose({ editingFileId })
 .search-clear:hover { color: var(--text-primary); background: var(--surface-hover); }
 
 /* File list */
-.file-list { flex: 1; overflow-y: auto; padding: 6px; }
+.file-list { flex: 1; overflow-y: auto; padding: 6px; position: relative; }
 .file-item {
   padding: 8px 10px; border-radius: var(--radius); cursor: pointer;
   transition: all 0.15s; margin-bottom: 2px; position: relative;
 }
 .file-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
 .file-item.active { background: var(--accent-light); box-shadow: var(--shadow-sm); border-left: 3px solid var(--accent); padding-left: 7px; }
-.file-item.dragging { opacity: 0.3; transform: scale(0.98); }
-.file-item.drag-over { border-top: 3px solid var(--accent); padding-top: 5px; background: var(--accent-light); }
+.file-item.dragging {
+  opacity: 0.5; transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 10;
+}
+.file-item.drag-over { background: var(--accent-light); }
+.file-item.drag-over::before {
+  content: ''; position: absolute; top: -2px; left: 4px; right: 4px;
+  height: 3px; background: var(--accent); border-radius: 2px;
+  animation: drag-indicator-in 0.15s ease;
+}
+@keyframes drag-indicator-in {
+  from { transform: scaleX(0); } to { transform: scaleX(1); }
+}
+/* 文件列表动画 */
+.file-list-move { transition: transform 0.25s ease; }
+.file-list-enter-active { transition: all 0.2s ease; }
+.file-list-leave-active { transition: all 0.15s ease; position: absolute; width: calc(100% - 12px); }
+.file-list-enter-from { opacity: 0; transform: translateX(-10px); }
+.file-list-leave-to { opacity: 0; transform: translateX(10px); }
 
 .file-item-top { display: flex; align-items: flex-start; gap: 4px; }
 .file-name {

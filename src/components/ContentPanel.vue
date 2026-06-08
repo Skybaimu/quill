@@ -488,29 +488,37 @@ function renderMd(text) {
   if (!text) {
     return '<p style="color:var(--text-muted)">暂无内容</p>'
   }
-  
-  // Add line numbers to tokens for cursor mapping
-  const tokens = marked.lexer(text)
-  
-  let currentLine = 0
-  function attachLines(tokensList) {
-    for (const token of tokensList) {
-      if (token.raw) {
-        token._line = currentLine
-        const newlines = (token.raw.match(/\n/g) || []).length
-        currentLine += newlines
+
+  try {
+    // Add line numbers to tokens for cursor mapping
+    const tokens = marked.lexer(text)
+
+    let currentLine = 0
+    function attachLines(tokensList) {
+      for (const token of tokensList) {
+        if (token.raw) {
+          token._line = currentLine
+          const newlines = (token.raw.match(/\n/g) || []).length
+          currentLine += newlines
+        }
+        if (token.tokens) attachLines(token.tokens)
+        if (token.items) attachLines(token.items)
       }
-      if (token.tokens) attachLines(token.tokens)
-      if (token.items) attachLines(token.items)
     }
+    attachLines(tokens)
+
+    // 显式传入 extensions，防止 Vite 环境下 marked.use() 的扩展丢失
+    const rawHtml = marked.parser(tokens, { renderer, extensions: marked.defaults.extensions })
+    if (hasQuery.value) {
+      return highlightText(rawHtml, store.searchQuery.trim())
+    }
+    return rawHtml
+  } catch (err) {
+    console.error('[Markdown render error]', err)
+    // 渲染失败时降级：返回原始文本（转义 HTML 实体），防止白屏崩溃
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return `<div style="color:var(--accent);padding:12px;border:1px solid var(--accent);border-radius:8px;margin-bottom:12px;font-size:13px;">⚠️ 内容渲染出错（可能是数学公式格式问题），已降级显示原始文本。请切换到编辑模式检查内容。</div><pre style="white-space:pre-wrap;word-break:break-word;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;">${escaped}</pre>`
   }
-  attachLines(tokens)
-  
-  const rawHtml = marked.parser(tokens, { renderer })
-  if (hasQuery.value) {
-    return highlightText(rawHtml, store.searchQuery.trim())
-  }
-  return rawHtml
 }
 
 // Extract TOC and line mappings when file content changes
@@ -522,7 +530,16 @@ watch(() => currentFile.value?.content, (newContent) => {
     return
   }
 
-  const tokens = marked.lexer(newContent)
+  let tokens
+  try {
+    tokens = marked.lexer(newContent)
+  } catch (err) {
+    console.error('[Markdown lexer error]', err)
+    mdToc.value = []
+    lineMap.value = []
+    mdTocStr.value = '[]'
+    return
+  }
   let currentLine = 0
 
   function attachLines(tokensList) {

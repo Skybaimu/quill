@@ -101,45 +101,75 @@ onMounted(async () => {
     for (const path of paths) {
       try {
         const fileStat = await stat(path)
-        
+
         if (fileStat.isDirectory) {
-          // Handle folder
+          // Handle folder — read two levels: root + immediate subfolders
           const folderName = path.split(/[\\/]/).pop() || 'Imported Folder'
           const cat = addCategory()
           cat.name = folderName
           selectCategory(cat.id)
 
+          // Supported file extensions
+          const supportedExts = ['.md', '.txt', '.html', '.htm', '.json', '.xml', '.log', '.yaml', '.yml', '.js', '.ts', '.py', '.vue']
+
+          function isSupportedFile(name) {
+            return supportedExts.some(ext => name.endsWith(ext))
+          }
+
+          // Import a single file into the current category
+          async function importFile(filePath, fileName) {
+            const text = await readTextFile(filePath)
+            const newFile = addFile()
+            if (newFile) {
+              newFile.name = fileName
+              if (fileName.endsWith('.md')) {
+                newFile.type = 'markdown'
+                delete newFile.blocks
+                newFile.content = text
+              } else if (fileName.endsWith('.txt')) {
+                newFile.type = 'text'
+                newFile.blocks = [{
+                  id: 'b' + Date.now() + Math.random(),
+                  title: '导入内容',
+                  collapsed: false,
+                  starred: false,
+                  order: 0,
+                  items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
+                }]
+              } else {
+                newFile.type = 'code'
+                delete newFile.blocks
+                newFile.content = text
+              }
+              importedCount++
+            }
+          }
+
+          // Read root directory
           const entries = await readDir(path)
           for (const entry of entries) {
-            if (entry.isFile && (entry.name.endsWith('.md') || entry.name.endsWith('.txt') || entry.name.endsWith('.html') || entry.name.endsWith('.htm') || entry.name.endsWith('.json') || entry.name.endsWith('.xml') || entry.name.endsWith('.log') || entry.name.endsWith('.yaml') || entry.name.endsWith('.yml') || entry.name.endsWith('.js') || entry.name.endsWith('.ts') || entry.name.endsWith('.py') || entry.name.endsWith('.vue'))) {
+            if (entry.isFile && isSupportedFile(entry.name)) {
               try {
-                const text = await readTextFile(`${path}/${entry.name}`)
-                const newFile = addFile()
-                if (newFile) {
-                  newFile.name = entry.name // Keep extension
-                  if (entry.name.endsWith('.md')) {
-                    newFile.type = 'markdown'
-                    delete newFile.blocks
-                    newFile.content = text
-                  } else if (entry.name.endsWith('.txt')) {
-                    newFile.type = 'text'
-                    newFile.blocks = [{
-                      id: 'b' + Date.now() + Math.random(),
-                      title: '导入内容',
-                      collapsed: false,
-                      starred: false,
-                      order: 0,
-                      items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
-                    }]
-                  } else {
-                    newFile.type = 'code'
-                    delete newFile.blocks
-                    newFile.content = text
-                  }
-                  importedCount++
-                }
+                await importFile(`${path}/${entry.name}`, entry.name)
               } catch (err) {
                 console.error(`Failed to read file ${entry.name}:`, err)
+              }
+            } else if (entry.isDirectory) {
+              // Read one level of subdirectories (depth=2, no further recursion)
+              try {
+                const subEntries = await readDir(`${path}/${entry.name}`)
+                for (const subEntry of subEntries) {
+                  if (subEntry.isFile && isSupportedFile(subEntry.name)) {
+                    try {
+                      // Prefix with subfolder name to avoid collisions
+                      await importFile(`${path}/${entry.name}/${subEntry.name}`, `${entry.name}/${subEntry.name}`)
+                    } catch (err) {
+                      console.error(`Failed to read subfile ${entry.name}/${subEntry.name}:`, err)
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error(`Failed to read subfolder ${entry.name}:`, err)
               }
             }
           }

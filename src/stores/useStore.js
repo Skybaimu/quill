@@ -1,4 +1,5 @@
 import { reactive, computed, watch, toRaw } from 'vue'
+import { logger } from '../utils/logger.js'
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
@@ -325,12 +326,14 @@ export function selectFile(id) {
 }
 
 export function addCategory() {
+  // 使用所有现有分类中最大的 order + 1，确保新分类始终排在最后
+  const maxOrder = store.categories.reduce((max, c) => Math.max(max, c.order ?? 0), -1)
   const cat = {
     id: 'c' + uid(),
     name: '',
     icon: ['sparkle', 'bulb', 'doc'][Math.floor(Math.random() * 3)],
     pinned: false,
-    order: store.categories.length
+    order: maxOrder + 1
   }
   store.categories.push(cat)
   store.files[cat.id] = []
@@ -450,10 +453,84 @@ export function deleteCategory(catId) {
   return true
 }
 
-export function swapOrder(arr, idA, idB) {
-  const a = arr.find(x => x.id === idA)
-  const b = arr.find(x => x.id === idB)
-  if (a && b) [a.order, b.order] = [b.order, a.order]
+// 拖拽重排：将分类从原位置取出，插入到目标位置
+export function reorderCategory(srcId, targetId) {
+  if (srcId === targetId) return
+  const src = store.categories.find(c => c.id === srcId)
+  const dst = store.categories.find(c => c.id === targetId)
+  if (!src || !dst) return
+  // 不允许跨 pinned 分界线拖拽
+  if (src.pinned !== dst.pinned) {
+    logger.warn('Store', '不可跨置顶/非置顶分界拖拽分类', { src: src.name, dst: dst.name })
+    return
+  }
+  // 排序后执行 splice 移动
+  const sorted = [...store.categories]
+    .filter(c => c.pinned === src.pinned)
+    .sort((a, b) => a.order - b.order)
+  const fromIdx = sorted.findIndex(c => c.id === srcId)
+  const toIdx = sorted.findIndex(c => c.id === targetId)
+  if (fromIdx < 0 || toIdx < 0) return
+  // splice: 取出 → 插入
+  const [moved] = sorted.splice(fromIdx, 1)
+  sorted.splice(toIdx, 0, moved)
+  // 重新赋 order
+  sorted.forEach((c, i) => c.order = i)
+  logger.info('Store', `分类重排: "${src.name}" → 位置 ${toIdx}`)
+}
+
+// 拖拽重排：将文件从原位置取出，插入到目标位置（同一分类内）
+export function reorderFile(srcId, targetId) {
+  if (srcId === targetId) return
+  const files = store.files[store.currentCat] || []
+  const src = files.find(f => f.id === srcId)
+  const dst = files.find(f => f.id === targetId)
+  if (!src || !dst) return
+  // 不允许跨 pinned 分界线
+  if (src.pinned !== dst.pinned) {
+    logger.warn('Store', '不可跨置顶/非置顶分界拖拽文件')
+    return
+  }
+  const sorted = files
+    .filter(f => f.pinned === src.pinned)
+    .sort((a, b) => a.order - b.order)
+  const fromIdx = sorted.findIndex(f => f.id === srcId)
+  const toIdx = sorted.findIndex(f => f.id === targetId)
+  if (fromIdx < 0 || toIdx < 0) return
+  const [moved] = sorted.splice(fromIdx, 1)
+  sorted.splice(toIdx, 0, moved)
+  sorted.forEach((f, i) => f.order = i)
+  logger.info('Store', `文件重排: "${src.name}" → 位置 ${toIdx}`)
+}
+
+// 跨分类拖拽文件
+export function moveFileToCategory(fileId, toCatId) {
+  // 在所有分类中找到文件
+  let fromCatId = null
+  let fileObj = null
+  for (const catId in store.files) {
+    const idx = store.files[catId].findIndex(f => f.id === fileId)
+    if (idx > -1) {
+      fromCatId = catId
+      fileObj = store.files[catId][idx]
+      break
+    }
+  }
+  if (!fileObj || !fromCatId || fromCatId === toCatId) return
+  // 从源分类移除
+  store.files[fromCatId] = store.files[fromCatId].filter(f => f.id !== fileId)
+  // 添加到目标分类末尾
+  if (!store.files[toCatId]) store.files[toCatId] = []
+  fileObj.order = store.files[toCatId].length
+  store.files[toCatId].push(fileObj)
+  // 如果当前正在查看被移走的文件，切换到源分类第一个文件
+  if (store.currentFile === fileId) {
+    const remaining = store.files[fromCatId] || []
+    store.currentFile = remaining.length ? remaining[0].id : null
+  }
+  const toCat = store.categories.find(c => c.id === toCatId)
+  logger.info('Store', `文件 "${fileObj.name}" 移动到分类 "${toCat?.name || toCatId}"`)
+  showToast(`已移动到 "${toCat?.name || '目标分类'}"`)
 }
 
 // Export current file as JSON

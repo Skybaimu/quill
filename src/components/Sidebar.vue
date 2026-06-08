@@ -58,6 +58,7 @@
           </div>
         </div>
         <div class="category-list">
+          <TransitionGroup name="cat-list">
           <div
             v-for="cat in sortedCategories"
             :key="cat.id"
@@ -101,6 +102,7 @@
               </button>
             </template>
           </div>
+          </TransitionGroup>
         </div>
       </div>
 
@@ -142,8 +144,6 @@
       </div>
     </div>
 
-      <!-- Drag over hint -->
-      <div class="drag-hint" v-if="dragOverId === 'sidebar'">放入侧栏</div>
     </div>
 
     <!-- User center at bottom -->
@@ -155,7 +155,8 @@
 import { ref, computed, nextTick } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readDir, readTextFile } from '@tauri-apps/plugin-fs'
-import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast, hasGlobalPassword, isGlobalUnlocked, unlockGlobal } from '../stores/useStore.js'
+import { store, getSortedCategories, getFileCount, selectCategory, addCategory as storeAddCategory, addFile as storeAddFile, selectFile, exportAllAsJson, importFromJson, downloadFile, readFileAsText, showToast, hasGlobalPassword, isGlobalUnlocked, unlockGlobal, reorderCategory as storeReorderCategory, moveFileToCategory } from '../stores/useStore.js'
+import { logger } from '../utils/logger.js'
 import UserCenter from './UserCenter.vue'
 
 const ICONS = {
@@ -169,6 +170,8 @@ const editingCatId = ref(null)
 const catNameInputRef = ref(null)
 const dragCatId = ref(null)
 const dragOverId = ref(null)
+const dragType = ref(null) // 'category' | 'file' — 区分拖的是分类还是文件
+const dragLeaveTimer = ref(null)
 const showMenu = ref(false)
 
 // Inline Rename via Context Menu Event
@@ -269,41 +272,66 @@ async function doOpenFolder() {
     cat.name = folderName
     selectCategory(cat.id)
 
-    const entries = await readDir(dirPath)
+    const supportedExts = ['.md', '.txt', '.html', '.htm', '.json', '.xml', '.log', '.yaml', '.yml', '.js', '.ts', '.py', '.vue']
+
+    function isSupportedFile(name) {
+      return supportedExts.some(ext => name.endsWith(ext))
+    }
+
+    async function importFile(filePath, fileName) {
+      const text = await readTextFile(filePath)
+      const newFile = storeAddFile()
+      if (newFile) {
+        newFile.name = fileName
+        if (fileName.endsWith('.md')) {
+          newFile.type = 'markdown'
+          delete newFile.blocks
+          newFile.content = text
+        } else if (fileName.endsWith('.txt')) {
+          newFile.type = 'text'
+          newFile.blocks = [{
+            id: 'b' + Date.now() + Math.random(),
+            title: '导入内容',
+            collapsed: false,
+            starred: false,
+            order: 0,
+            items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
+          }]
+        } else {
+          newFile.type = 'code'
+          delete newFile.blocks
+          newFile.content = text
+        }
+        return true
+      }
+      return false
+    }
+
     let importedCount = 0
+    const entries = await readDir(dirPath)
 
     for (const entry of entries) {
-      if (entry.isFile && (entry.name.endsWith('.md') || entry.name.endsWith('.txt') || entry.name.endsWith('.html') || entry.name.endsWith('.htm') || entry.name.endsWith('.json') || entry.name.endsWith('.xml') || entry.name.endsWith('.log') || entry.name.endsWith('.yaml') || entry.name.endsWith('.yml') || entry.name.endsWith('.js') || entry.name.endsWith('.ts') || entry.name.endsWith('.py') || entry.name.endsWith('.vue'))) {
+      if (entry.isFile && isSupportedFile(entry.name)) {
         try {
-          const filePath = `${dirPath}/${entry.name}`
-          const text = await readTextFile(filePath)
-          
-          const newFile = storeAddFile()
-          if (newFile) {
-            newFile.name = entry.name // Keep extension
-            if (entry.name.endsWith('.md')) {
-              newFile.type = 'markdown'
-              delete newFile.blocks
-              newFile.content = text
-            } else if (entry.name.endsWith('.txt')) {
-              newFile.type = 'text'
-              newFile.blocks = [{
-                id: 'b' + Date.now() + Math.random(),
-                title: '导入内容',
-                collapsed: false,
-                starred: false,
-                order: 0,
-                items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
-              }]
-            } else {
-              newFile.type = 'code'
-              delete newFile.blocks
-              newFile.content = text
-            }
-            importedCount++
-          }
+          if (await importFile(`${dirPath}/${entry.name}`, entry.name)) importedCount++
         } catch (err) {
           console.error(`Failed to read file ${entry.name}:`, err)
+        }
+      } else if (entry.isDirectory) {
+        // Read one level of subdirectories (depth=2, no further recursion)
+        try {
+          const subEntries = await readDir(`${dirPath}/${entry.name}`)
+          for (const subEntry of subEntries) {
+            if (subEntry.isFile && isSupportedFile(subEntry.name)) {
+              try {
+                if (await importFile(`${dirPath}/${entry.name}/${subEntry.name}`, `${entry.name}/${subEntry.name}`)) importedCount++
+              } catch (err) {
+                console.error(`Failed to read subfile ${entry.name}/${subEntry.name}:`, err)
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to read subfolder ${entry.name}:`, err)
         }
       }
     }
@@ -401,42 +429,70 @@ async function doOpenFile(e) {
   showMenu.value = false
 }
 
-// Drag & drop for categories
+// Drag & drop for categories (支持分类重排 + 文件跨分类拖入)
 function onCatDragStart(e, id) {
   dragCatId.value = id
+  dragType.value = 'category'
   e.target.classList.add('dragging')
   e.dataTransfer.effectAllowed = 'move'
   e.dataTransfer.setData('text/plain', id)
+  logger.info('Sidebar', '分类拖拽开始', { id })
 }
 
 function onCatDragOver(e, id) {
   e.preventDefault()
   e.dataTransfer.dropEffect = 'move'
+  // 清除延迟清除 timer（防止子元素触发 dragleave 导致闪烁）
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
   dragOverId.value = id
 }
 
 function onCatDragLeave() {
-  dragOverId.value = null
+  // 延迟清除，防止进入子元素时闪烁
+  if (dragLeaveTimer.value) clearTimeout(dragLeaveTimer.value)
+  dragLeaveTimer.value = setTimeout(() => {
+    dragOverId.value = null
+    dragLeaveTimer.value = null
+  }, 50)
 }
 
 function onCatDrop(e, targetId) {
-  const srcId = dragCatId.value
-  if (srcId && srcId !== targetId) {
-    const src = store.categories.find(c => c.id === srcId)
-    const dst = store.categories.find(c => c.id === targetId)
-    if (src && dst) {
-      const tmpOrder = src.order
-      src.order = dst.order
-      dst.order = tmpOrder
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
+  // 检测是否从文件列表拖来的文件
+  const isFileDrag = e.dataTransfer.types.includes('application/x-quill-file')
+  if (isFileDrag || dragType.value === 'file') {
+    // 文件跨分类拖入
+    const fileId = e.dataTransfer.getData('text/plain') || dragCatId.value
+    if (fileId) {
+      moveFileToCategory(fileId, targetId)
+      logger.info('Sidebar', '文件跨分类拖入', { fileId, toCat: targetId })
+    }
+  } else {
+    // 分类重排
+    const srcId = dragCatId.value
+    if (srcId && srcId !== targetId) {
+      storeReorderCategory(srcId, targetId)
     }
   }
   dragOverId.value = null
   dragCatId.value = null
+  dragType.value = null
 }
 
 function onDragEnd() {
+  if (dragLeaveTimer.value) {
+    clearTimeout(dragLeaveTimer.value)
+    dragLeaveTimer.value = null
+  }
   dragCatId.value = null
   dragOverId.value = null
+  dragType.value = null
   document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('dragging'))
 }
 </script>
@@ -505,6 +561,7 @@ function onDragEnd() {
 }
 .icon-btn:hover { background: var(--accent-light); color: var(--accent); }
 
+.category-list { position: relative; }
 /* Category items */
 .cat-item {
   display: flex; align-items: center; gap: 10px;
@@ -514,8 +571,25 @@ function onDragEnd() {
 }
 .cat-item:hover { background: var(--surface-hover); color: var(--text-primary); }
 .cat-item.active { background: var(--accent-light); color: var(--accent); }
-.cat-item.dragging { opacity: 0.3; transform: scale(0.96); }
-.cat-item.drag-over { border-top: 3px solid var(--accent); padding-top: 6px; background: var(--accent-light); }
+.cat-item.dragging {
+  opacity: 0.5; transform: scale(1.03);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 10;
+}
+.cat-item.drag-over { background: var(--accent-light); }
+.cat-item.drag-over::before {
+  content: ''; position: absolute; top: -2px; left: 4px; right: 4px;
+  height: 3px; background: var(--accent); border-radius: 2px;
+  animation: drag-indicator-in 0.15s ease;
+}
+@keyframes drag-indicator-in {
+  from { transform: scaleX(0); } to { transform: scaleX(1); }
+}
+/* 分类列表动画 */
+.cat-list-move { transition: transform 0.25s ease; }
+.cat-list-enter-active { transition: all 0.2s ease; }
+.cat-list-leave-active { transition: all 0.15s ease; position: absolute; width: 100%; }
+.cat-list-enter-from { opacity: 0; transform: translateX(-10px); }
+.cat-list-leave-to { opacity: 0; transform: translateX(10px); }
 
 .cat-pin {
   position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
