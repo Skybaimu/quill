@@ -1,0 +1,19 @@
+client:510 Failed to parse CLI arguments: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at App.vue:73:27
+core-CZSRLj5N.js?v=e2085aa5:90 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'transformCallback')
+    at App.vue:82:3
+core-CZSRLj5N.js?v=e2085aa5:90 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'transformCallback')
+    at App.vue:95:3
+content_main.js:4707 This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316
+logger.js:27 [07:46:09.352][Sidebar] 分类拖拽开始 
+Object
+logger.js:27 [07:46:09.857][Store] 分类重排: "Markdown" → 位置 1 
+logger.js:27 [07:46:11.112][Sidebar] 分类拖拽开始 
+Object
+logger.js:27 [07:46:11.544][Store] 分类重排: "密码 & API Keys" → 位置 1 
+5
+​:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+client:510 [Markdown render error] Error: Token with "inlineKatex" type was not found.
+    at renderer.paragraph (ContentPanel.vue:473:58)
+    at Proxy.renderMd (ContentPanel.vue:510:28)
+    at Proxy._sfc_render (ContentPanel.vue:103:45)

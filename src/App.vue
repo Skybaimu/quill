@@ -13,9 +13,9 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import { stat, readDir, readTextFile } from '@tauri-apps/plugin-fs'
+import { readTextFile } from '@tauri-apps/plugin-fs'
 import { getMatches } from '@tauri-apps/plugin-cli'
 import Sidebar from './components/Sidebar.vue'
 import FilePanel from './components/FilePanel.vue'
@@ -67,6 +67,51 @@ async function openFileFromPath(path) {
   }
 }
 
+// Supported file extensions for drag-drop import
+const SUPPORTED_EXTS = ['.md', '.txt', '.html', '.htm', '.json', '.xml', '.log', '.yaml', '.yml', '.js', '.ts', '.py', '.vue']
+function isSupportedFile(name) {
+  return SUPPORTED_EXTS.some(ext => name.toLowerCase().endsWith(ext))
+}
+
+// Import a single file (by HTML5 File object) into the current category
+async function importDroppedFile(file, displayName) {
+  const name = displayName || file.name
+  if (!isSupportedFile(name)) return false
+  try {
+    const text = await file.text()
+    const newFile = addFile()
+    if (!newFile) return false
+    newFile.name = name
+    if (name.endsWith('.md') || name.endsWith('.markdown')) {
+      newFile.type = 'markdown'; delete newFile.blocks; newFile.content = text
+    } else if (name.endsWith('.txt')) {
+      newFile.type = 'text'
+      newFile.blocks = [{ id: 'b' + Date.now() + Math.random(), title: '导入内容', collapsed: false, starred: false, order: 0, items: [{ id: 'i' + Date.now() + Math.random(), label: '', text, type: 'text' }] }]
+    } else {
+      newFile.type = 'code'; delete newFile.blocks; newFile.content = text
+    }
+    return true
+  } catch (err) { console.error('[Drop] Failed to import file:', name, err); return false }
+}
+
+// Collect files from a FileSystemDirectoryEntry (two levels deep)
+function collectFromDirectoryEntry(dirEntry, path, maxDepth, collected) {
+  return new Promise((resolve) => {
+    const reader = dirEntry.createReader()
+    reader.readEntries(async (entries) => {
+      for (const entry of entries) {
+        if (entry.isFile) {
+          const file = await new Promise(r => entry.file(r))
+          collected.push({ file, path: path ? path + '/' + entry.name : entry.name })
+        } else if (entry.isDirectory && maxDepth > 0) {
+          await collectFromDirectoryEntry(entry, path ? path + '/' + entry.name : entry.name, maxDepth - 1, collected)
+        }
+      }
+      resolve()
+    }, () => resolve())
+  })
+}
+
 onMounted(async () => {
   // Check CLI arguments for files opened externally
   try {
@@ -81,141 +126,54 @@ onMounted(async () => {
   // Listen for single instance event (when user double-clicks another .md file while app is running)
   listen('single-instance', async (event) => {
     const args = event.payload
-    // The arguments are usually: [ "path/to/quill.exe", "path/to/file.md" ]
     if (args && args.length > 1) {
       const filePath = args[args.length - 1]
-      // Quick check if it looks like a file path
       if (filePath && !filePath.startsWith('--') && (filePath.includes('\\') || filePath.includes('/'))) {
         await openFileFromPath(filePath)
       }
     }
   })
 
-  // Listen for native file drops via Tauri
-  listen('tauri://drag-drop', async (event) => {
-    const paths = event.payload.paths
-    if (!paths || paths.length === 0) return
+  // HTML5 drop handler for external files/folders (works in both browser and Tauri)
+  // Internal drag-drop (category/file reordering) is handled by Sidebar.vue / FilePanel.vue
+  // via @drop.prevent.stop which stops propagation, so this handler only fires for external drops.
+  window.addEventListener('drop', async (e) => {
+    // Skip if no files (internal drag from our components won't have Files type)
+    if (!e.dataTransfer?.files?.length) return
+
+    const items = Array.from(e.dataTransfer.items || [])
+    const entries = items.map(i => i.webkitGetAsEntry?.()).filter(Boolean)
 
     let importedCount = 0
-
-    for (const path of paths) {
-      try {
-        const fileStat = await stat(path)
-
-        if (fileStat.isDirectory) {
-          // Handle folder — read two levels: root + immediate subfolders
-          const folderName = path.split(/[\\/]/).pop() || 'Imported Folder'
-          const cat = addCategory()
-          cat.name = folderName
-          selectCategory(cat.id)
-
-          // Supported file extensions
-          const supportedExts = ['.md', '.txt', '.html', '.htm', '.json', '.xml', '.log', '.yaml', '.yml', '.js', '.ts', '.py', '.vue']
-
-          function isSupportedFile(name) {
-            return supportedExts.some(ext => name.endsWith(ext))
-          }
-
-          // Import a single file into the current category
-          async function importFile(filePath, fileName) {
-            const text = await readTextFile(filePath)
-            const newFile = addFile()
-            if (newFile) {
-              newFile.name = fileName
-              if (fileName.endsWith('.md')) {
-                newFile.type = 'markdown'
-                delete newFile.blocks
-                newFile.content = text
-              } else if (fileName.endsWith('.txt')) {
-                newFile.type = 'text'
-                newFile.blocks = [{
-                  id: 'b' + Date.now() + Math.random(),
-                  title: '导入内容',
-                  collapsed: false,
-                  starred: false,
-                  order: 0,
-                  items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
-                }]
-              } else {
-                newFile.type = 'code'
-                delete newFile.blocks
-                newFile.content = text
-              }
-              importedCount++
-            }
-          }
-
-          // Read root directory
-          const entries = await readDir(path)
-          for (const entry of entries) {
-            if (entry.isFile && isSupportedFile(entry.name)) {
-              try {
-                await importFile(`${path}/${entry.name}`, entry.name)
-              } catch (err) {
-                console.error(`Failed to read file ${entry.name}:`, err)
-              }
-            } else if (entry.isDirectory) {
-              // Read one level of subdirectories (depth=2, no further recursion)
-              try {
-                const subEntries = await readDir(`${path}/${entry.name}`)
-                for (const subEntry of subEntries) {
-                  if (subEntry.isFile && isSupportedFile(subEntry.name)) {
-                    try {
-                      // Prefix with subfolder name to avoid collisions
-                      await importFile(`${path}/${entry.name}/${subEntry.name}`, `${entry.name}/${subEntry.name}`)
-                    } catch (err) {
-                      console.error(`Failed to read subfile ${entry.name}/${subEntry.name}:`, err)
-                    }
-                  }
-                }
-              } catch (err) {
-                console.error(`Failed to read subfolder ${entry.name}:`, err)
-              }
-            }
-          }
-        } else if (fileStat.isFile) {
-          // Handle single file
-          const fileName = path.split(/[\\/]/).pop()
-          if (fileName.endsWith('.md') || fileName.endsWith('.txt') || fileName.endsWith('.html') || fileName.endsWith('.htm') || fileName.endsWith('.json') || fileName.endsWith('.xml') || fileName.endsWith('.log') || fileName.endsWith('.yaml') || fileName.endsWith('.yml') || fileName.endsWith('.js') || fileName.endsWith('.ts') || fileName.endsWith('.py') || fileName.endsWith('.vue')) {
-            const text = await readTextFile(path)
-            const newFile = addFile()
-            if (newFile) {
-              newFile.name = fileName // Keep extension
-              if (fileName.endsWith('.md')) {
-                newFile.type = 'markdown'
-                delete newFile.blocks
-                newFile.content = text
-              } else if (fileName.endsWith('.txt')) {
-                newFile.type = 'text'
-                newFile.blocks = [{
-                  id: 'b' + Date.now() + Math.random(),
-                  title: '导入内容',
-                  collapsed: false,
-                  starred: false,
-                  order: 0,
-                  items: [{ id: 'i' + Date.now() + Math.random(), label: '', text: text, type: 'text' }]
-                }]
-              } else {
-                newFile.type = 'code'
-                delete newFile.blocks
-                newFile.content = text
-              }
-              selectFile(newFile.id)
-              importedCount++
-            }
-          }
+    for (const entry of entries) {
+      if (entry.isFile) {
+        const file = await new Promise(r => entry.file(r))
+        if (await importDroppedFile(file)) importedCount++
+      } else if (entry.isDirectory) {
+        // Read root + one level of subdirectories
+        const folderName = entry.name || 'Imported Folder'
+        const cat = addCategory()
+        cat.name = folderName
+        selectCategory(cat.id)
+        const collected = []
+        await collectFromDirectoryEntry(entry, '', 1, collected)
+        for (const { file, path: filePath } of collected) {
+          if (await importDroppedFile(file, filePath)) importedCount++
         }
-      } catch (err) {
-        console.error('Failed to handle drop path:', path, err)
       }
     }
 
     if (importedCount > 0) {
       showToast(`已成功导入 ${importedCount} 个文件`)
-    } else {
+    } else if (e.dataTransfer?.files?.length > 0) {
       showToast('没有找到支持的文件格式')
     }
-  })
+  }, true)
+
+  // Prevent default dragover so external file drops are accepted
+  window.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types?.includes('Files')) e.preventDefault()
+  }, true)
 })
 </script>
 
