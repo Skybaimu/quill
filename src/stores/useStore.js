@@ -170,7 +170,8 @@ const store = reactive({
   toastMessage: '',
   toastTimer: null,
   // Global lock state
-  globalUnlockedUntil: 0
+  globalUnlockedUntil: 0,
+  autoLockDuration: 4 * 60 * 60 * 1000 // 默认 4 小时
 })
 
 export function isPasswordFile(id) {
@@ -182,7 +183,11 @@ export function isGlobalUnlocked() {
 }
 
 export function unlockGlobal() {
-  store.globalUnlockedUntil = Date.now() + 30 * 60 * 1000 // 30 minutes
+  store.globalUnlockedUntil = Date.now() + store.autoLockDuration
+}
+
+export function setAutoLockDuration(ms) {
+  store.autoLockDuration = ms
 }
 
 export function lockGlobal() {

@@ -82,6 +82,17 @@
           </div>
           <div class="uc-pw-hint" v-if="hasGlobalPw">已设置全局密码，保护 {{ lockedCount }} 个文件</div>
           <div class="uc-pw-hint" v-else>未设置密码，文件无法加密保护</div>
+          <div class="uc-field" style="margin-top:12px" v-if="hasGlobalPw">
+            <label>免密时长</label>
+            <div class="uc-lock-row">
+              <input class="uc-lock-input" type="number" v-model.number="autoLockValue" min="1" />
+              <div class="uc-btn-group">
+                <button class="uc-toggle-btn" :class="{ active: autoLockUnit === 'hour' }" @click="setAutoLockUnit('hour')">时</button>
+                <button class="uc-toggle-btn" :class="{ active: autoLockUnit === 'day' }" @click="setAutoLockUnit('day')">日</button>
+              </div>
+            </div>
+            <div class="uc-pw-hint">解锁后在此时间内免重复验证，默认 4 小时</div>
+          </div>
         </div>
 
         <div class="uc-section">
@@ -104,25 +115,6 @@
           <div class="uc-pw-hint">将清除所有数据并恢复为初始状态</div>
         </div>
 
-        <div class="uc-section">
-          <div class="uc-section-title">调试日志</div>
-          <div class="uc-log-info">已记录 {{ logCount }} 条日志</div>
-          <div class="uc-pw-actions">
-            <button class="uc-pw-btn" @click="handleCopyLogs">
-              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-              复制日志
-            </button>
-            <button class="uc-pw-btn" @click="handleDownloadLogs">
-              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-              下载日志
-            </button>
-            <button class="uc-pw-btn" @click="handleClearLogs">
-              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              清空
-            </button>
-          </div>
-          <div class="uc-pw-hint">记录拖拽、导入、文件操作等事件，便于排查问题</div>
-        </div>
 
         <div class="uc-section">
           <div class="uc-section-title">关于</div>
@@ -140,16 +132,24 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { open } from '@tauri-apps/plugin-shell'
-import { store, hasGlobalPassword, removeGlobalPassword, showToast } from '../stores/useStore.js'
-import { logger } from '../utils/logger.js'
+import { store, hasGlobalPassword, removeGlobalPassword, showToast, setAutoLockDuration } from '../stores/useStore.js'
 
 const showPanel = ref(false)
 
 const userName = ref(localStorage.getItem('quill-username') || '')
 const fontSize = ref(localStorage.getItem('quill-fontsize') || 'medium')
 const theme = ref(localStorage.getItem('quill-theme') || 'light')
+const autoLockValue = ref(Number(localStorage.getItem('quill-autolock-val')) || 4)
+const autoLockUnit = ref(localStorage.getItem('quill-autolock-unit') || 'hour')
+
+// 初始化免密时长
+onMounted(() => {
+  let ms = autoLockValue.value * 60 * 60 * 1000
+  if (autoLockUnit.value === 'day') ms = autoLockValue.value * 24 * 60 * 60 * 1000
+  setAutoLockDuration(ms)
+})
 
 // 监听字体大小并更新 CSS 变量
 watch(fontSize, (val) => {
@@ -172,6 +172,24 @@ watch(theme, (val) => {
   }
   localStorage.setItem('quill-theme', val)
 }, { immediate: true })
+
+// 自动锁定时长
+function setAutoLockUnit(unit) {
+  autoLockUnit.value = unit
+  applyAutoLock()
+}
+
+function applyAutoLock() {
+  const val = autoLockValue.value
+  if (!val || val < 1) return
+  localStorage.setItem('quill-autolock-val', String(val))
+  localStorage.setItem('quill-autolock-unit', autoLockUnit.value)
+  let ms = val * 60 * 60 * 1000
+  if (autoLockUnit.value === 'day') ms = val * 24 * 60 * 60 * 1000
+  setAutoLockDuration(ms)
+}
+
+watch(autoLockValue, () => applyAutoLock())
 
 const initials = computed(() => {
   if (!userName.value) return '?'
@@ -236,24 +254,6 @@ function handleDeletePassword() {
     showToast('已删除全局密码，所有文件已解锁')
   }
   store.lockVisible = true
-}
-
-// 日志相关
-const logCount = computed(() => logger.getEntryCount())
-
-async function handleCopyLogs() {
-  await logger.copyToClipboard()
-  showToast('日志已复制到剪贴板')
-}
-
-function handleDownloadLogs() {
-  logger.download()
-  showToast('日志已下载')
-}
-
-function handleClearLogs() {
-  logger.clear()
-  showToast('日志已清空')
 }
 
 function openGithub() {
@@ -419,6 +419,16 @@ watch(() => store.sidebarCollapsed, (v) => {
   box-shadow: var(--shadow-sm); font-weight: 500;
 }
 .uc-toggle-btn:not(.active):hover { color: var(--text-primary); }
+
+/* Auto-lock row */
+.uc-lock-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.uc-lock-row .uc-toggle-btn { padding: 5px 16px; font-size: 12px; }
+.uc-lock-input {
+  width: 56px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: inherit; font-size: 13px; text-align: center;
+  background: var(--surface); color: var(--text-primary);
+}
+.uc-lock-input:focus { outline: none; border-color: var(--accent); }
 
 /* Stats */
 .uc-stats { display: flex; gap: 12px; }

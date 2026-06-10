@@ -267,7 +267,6 @@ const currentSecurityQuestions = computed(() => {
 watch(() => store.lockVisible, async (v) => {
   if (!v) return
   // 重置所有状态
-  unlockTab.value = 'pattern'
   resetPattern()
   pinValue.value = ''
   pinError.value = ''
@@ -278,8 +277,11 @@ watch(() => store.lockVisible, async (v) => {
   forgotVerifying.value = false
   resetSetup()
 
-  // 迁移旧密码
+  // 迁移旧密码（完成后 hasPattern/hasPin 已更新）
   await migrateIfNeeded()
+
+  // 根据实际密码类型设置解锁页（PIN-only 时直接跳到 pin）
+  unlockTab.value = hasPin.value && !hasPattern.value ? 'pin' : 'pattern'
 })
 
 async function migrateIfNeeded() {
