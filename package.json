@@ -1,7 +1,7 @@
 {
   "name": "quill",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,11 +16,7 @@
     "@tauri-apps/plugin-fs": "^2.5.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "highlight.js": "^11.11.1",
-    "katex": "^0.16.45",
-    "marked": "^18.0.0",
-    "marked-alert": "^2.1.2",
-    "marked-highlight": "^2.2.4",
-    "marked-katex-extension": "^5.1.8",
+    "vditor": "^3.11.2",
     "vue": "^3.5.32"
   },
   "devDependencies": {

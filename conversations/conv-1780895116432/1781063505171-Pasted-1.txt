@@ -1,0 +1,8 @@
+  at <App>
+(anonymous) @ client:510
+marked.js?v=884b3757:1383 Uncaught Error: renderer 'inlineKatex' does not exist
+    at marked.js?v=884b3757:1383:27
+    at Array.forEach (<anonymous>)
+    at D.use (marked.js?v=884b3757:1363:12)
+    at g.use (marked.js?v=884b3757:1507:11)
+    at setup (ContentPanel.vue:502:8)
