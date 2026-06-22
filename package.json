@@ -1,7 +1,7 @@
 {
   "name": "quill",
   "private": true,
-  "version": "1.7.6",
+  "version": "1.7.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
     "@vitejs/plugin-vue": "^6.0.5",
-    "vite": "^8.0.4"
+    "vite": "^8.0.4",
+    "vite-plugin-static-copy": "^4.1.1"
   }
 }
