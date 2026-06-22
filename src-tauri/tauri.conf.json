@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Quill",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "identifier": "com.skybaimu.quill",
   "build": {
     "frontendDist": "../dist",
@@ -56,7 +56,7 @@
       {
         "ext": ["txt"],
         "mimeType": "text/plain",
-        "description": "纯文本文档"
+        "description": "纯文本文�?
       }
     ],
     "windows": {
