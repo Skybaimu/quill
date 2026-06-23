@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import './styles/main.css'
+import 'highlight.js/styles/github.css'
 import App from './App.vue'
 import { trackStartup } from './utils/analytics.js'
 

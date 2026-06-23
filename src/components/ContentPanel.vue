@@ -324,7 +324,6 @@ function hlText(text) {
 }
 
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
 import { open } from '@tauri-apps/plugin-shell'
 const codeTextareaRef = ref(null)
 
