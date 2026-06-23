@@ -270,6 +270,7 @@ async function doOpenFolder() {
     const folderName = dirPath.split(/[\\/]/).pop() || 'Imported Folder'
     const cat = storeAddCategory()
     cat.name = folderName
+    cat.sourcePath = dirPath
     selectCategory(cat.id)
 
     const supportedExts = ['.md', '.txt', '.html', '.htm', '.json', '.xml', '.log', '.yaml', '.yml', '.js', '.ts', '.py', '.vue']

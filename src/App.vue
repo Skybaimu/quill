@@ -154,6 +154,19 @@ onMounted(async () => {
         const folderName = entry.name || 'Imported Folder'
         const cat = addCategory()
         cat.name = folderName
+        
+        // Track original path if available (Tauri drag-drop sets .path on the File objects)
+        let folderPath = ''
+        if (e.dataTransfer?.files) {
+          for (let i = 0; i < e.dataTransfer.files.length; i++) {
+            const f = e.dataTransfer.files[i]
+            if (f.name === entry.name && f.path) {
+              folderPath = f.path; break
+            }
+          }
+        }
+        if (folderPath) cat.sourcePath = folderPath
+        
         selectCategory(cat.id)
         const collected = []
         await collectFromDirectoryEntry(entry, '', 1, collected)
@@ -169,6 +182,62 @@ onMounted(async () => {
       showToast('没有找到支持的文件格式')
     }
   }, true)
+
+  // Listen for refresh folder requests
+  window.addEventListener('quill-refresh-folder', async (e) => {
+    const { id, mode } = e.detail
+    const cat = store.categories.find(c => c.id === id)
+    if (!cat || !cat.sourcePath) return
+    
+    try {
+      const { readDir, readTextFile } = await import('@tauri-apps/plugin-fs')
+      const { join } = await import('@tauri-apps/api/path')
+      
+      if (mode === 'refresh-overwrite') {
+        store.files[cat.id] = []
+      }
+      
+      let importedCount = 0
+      
+      async function collectTauriDir(dirPath, relPath, maxDepth) {
+        const entries = await readDir(dirPath)
+        for (const entry of entries) {
+          const entryRelPath = relPath ? relPath + '/' + entry.name : entry.name
+          const entryAbsPath = await join(dirPath, entry.name)
+          if (entry.isFile && isSupportedFile(entry.name)) {
+            if (mode === 'refresh-add') {
+              const existing = (store.files[cat.id] || []).find(f => f.name === entry.name || f.name === entryRelPath)
+              if (existing) continue
+            }
+            try {
+              const text = await readTextFile(entryAbsPath)
+              selectCategory(cat.id)
+              const newFile = addFile()
+              if (!newFile) continue
+              newFile.name = entryRelPath
+              if (entry.name.endsWith('.md') || entry.name.endsWith('.markdown')) {
+                newFile.type = 'markdown'; delete newFile.blocks; newFile.content = text
+              } else if (entry.name.endsWith('.txt')) {
+                newFile.type = 'text'
+                newFile.blocks = [{ id: 'b' + Date.now() + Math.random(), title: '导入内容', collapsed: false, starred: false, order: 0, items: [{ id: 'i' + Date.now() + Math.random(), label: '', text, type: 'text' }] }]
+              } else {
+                newFile.type = 'code'; delete newFile.blocks; newFile.content = text
+              }
+              importedCount++
+            } catch (err) { console.error('Failed to read', entryAbsPath, err) }
+          } else if (entry.isDirectory && maxDepth > 0) {
+            await collectTauriDir(entryAbsPath, entryRelPath, maxDepth - 1)
+          }
+        }
+      }
+      
+      await collectTauriDir(cat.sourcePath, '', 1)
+      showToast(`文件夹刷新完毕，新增 ${importedCount} 个文件`)
+    } catch (err) {
+      console.error('Refresh folder failed:', err)
+      showToast('刷新文件夹失败: ' + err.message)
+    }
+  })
 
   // Prevent default dragover so external file drops are accepted
   window.addEventListener('dragover', (e) => {

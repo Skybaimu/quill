@@ -52,6 +52,17 @@
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           删除
         </div>
+        <template v-if="targetCat?.sourcePath">
+          <div class="ctx-divider"></div>
+          <div class="ctx-item" @click="doAction('refresh-overwrite')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            刷新 (覆盖)
+          </div>
+          <div class="ctx-item" @click="doAction('refresh-add')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15M12 9v6m-3-3h6"/></svg>
+            刷新 (新增)
+          </div>
+        </template>
       </template>
     </div>
   </Teleport>
@@ -145,6 +156,12 @@ function doAction(act) {
         if (!deleteCategory(target)) showToast('至少保留一个分类')
         else showToast('已删除')
         break
+      case 'refresh-overwrite':
+      case 'refresh-add': {
+        const event = new CustomEvent('quill-refresh-folder', { detail: { id: cat.id, mode: act } })
+        window.dispatchEvent(event)
+        break
+      }
     }
   }
 }
