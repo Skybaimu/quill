@@ -269,6 +269,7 @@ onMounted(async () => {
     if (sortBy === 'sort-name') {
       // Natural sort by name (1, 2, 10, 11)
       store.files[id].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+      store.files[id].forEach((f, i) => f.order = i)
       showToast('已按名称排序')
     } else if (sortBy === 'sort-time') {
       // Sort by updatedAt descending (newest first)
@@ -277,6 +278,7 @@ onMounted(async () => {
         const timeB = b.updatedAt || b.createdAt || 0
         return timeB - timeA
       })
+      store.files[id].forEach((f, i) => f.order = i)
       showToast('已按时间排序')
     }
   })
