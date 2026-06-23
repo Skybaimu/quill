@@ -147,7 +147,7 @@ const store = reactive({
   filePanelCollapsed: false,
   searchScope: 'file',
   searchQuery: '',
-  mdEditMode: false,
+  mdEditMode: 'ir',
   mdTocCollapsed: true,
   // Context menu state
   ctxVisible: false,
@@ -308,7 +308,7 @@ export function selectCategory(id) {
   
   if (files.length > 0) {
     store.currentFile = files[0].id
-    store.mdEditMode = false
+    store.mdEditMode = 'ir'
   } else {
     store.currentFile = null
   }
@@ -327,7 +327,7 @@ export function selectFile(id) {
   }
 
   store.currentFile = id
-  store.mdEditMode = false
+  store.mdEditMode = 'ir'
 }
 
 export function addCategory() {
@@ -390,7 +390,7 @@ export function addFile() {
   files.push(file)
   store.files[store.currentCat] = files
   store.currentFile = file.id
-  store.mdEditMode = false
+  store.mdEditMode = 'ir'
   return file
 }
 

@@ -28,18 +28,19 @@
           </svg>
           锁定
         </button>
-        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked()) && !store.mdEditMode" @click="store.mdTocCollapsed = !store.mdTocCollapsed" :title="store.mdTocCollapsed ? '展开大纲' : '收起大纲'">
+        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleVditorOutline" title="切换大纲">
           <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h7"/>
           </svg>
           大纲
         </button>
-        <button class="action-btn" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())" @click="toggleMdEdit">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-          </svg>
-          {{ store.mdEditMode ? '预览' : '编辑' }}
-        </button>
+        <div class="action-select-wrapper" v-if="currentFile.type === 'markdown' && (!isPwdFile || isGlobalUnlocked())">
+          <select class="action-select" v-model="store.mdEditMode" title="编辑模式">
+            <option value="wysiwyg">所见即所得</option>
+            <option value="ir">即时渲染</option>
+            <option value="sv">分屏预览</option>
+          </select>
+        </div>
         <template v-if="currentFile.type !== 'markdown' && currentFile.type !== 'code' && (!isPwdFile || isGlobalUnlocked())">
           <button class="action-btn" @click="handleAddBlock" title="新建内容块">
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,6 +651,11 @@ defineExpose({ renamingBlockId, editingBlockId })
 const vditorInstance = shallowRef(null)
 let vditorReady = false
 
+function toggleVditorOutline() {
+  const btn = document.querySelector('.vditor-toolbar [data-type="outline"]')
+  if (btn) btn.click()
+}
+
 function initVditor() {
   if (currentFile.value?.type !== 'markdown') return
   
@@ -671,7 +677,7 @@ function initVditor() {
     vditorInstance.value = new Vditor('vditor', {
       height: '100%',
       value: currentFile.value.content || '',
-      mode: store.mdEditMode ? 'sv' : 'ir',
+      mode: store.mdEditMode,
       cache: { enable: false },
       cdn: '/vditor',
       theme: isDark ? 'dark' : 'classic',
@@ -681,7 +687,7 @@ function initVditor() {
         }
       },
       outline: {
-        enable: true,
+        enable: false,
         position: 'left'
       },
       toolbar: [
@@ -689,13 +695,17 @@ function initVditor() {
         'line', 'quote', 'list', 'ordered-list', 'check', '|',
         'code', 'inline-code', 'link', 'table', '|',
         'undo', 'redo', '|',
-        'edit-mode', 
         {
           name: 'more',
           toolbar: [
-            'fullscreen', 'both', 'outline', 'export',
+            'both', 'export',
             'code-theme', 'content-theme'
           ],
+        },
+        {
+          name: 'outline',
+          icon: '<svg><use xlink:href="#vditor-icon-outline"></use></svg>',
+          className: 'vditor-tool-hidden'
         }
       ],
       after: () => {
@@ -1202,4 +1212,90 @@ onUnmounted(() => {
   padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-light);
   z-index: 100;
 }
+/* Vditor deep overrides */
+:deep(.vditor) {
+  border: none !important;
+}
+:deep(.vditor-toolbar) {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+:deep(.vditor-toolbar__item) {
+  color: var(--text-secondary) !important;
+}
+:deep(.vditor-toolbar__item:hover) {
+  background-color: var(--surface-hover) !important;
+}
+:deep(.vditor-content) {
+  background-color: transparent !important;
+}
+:deep(.vditor-tool-hidden) {
+  display: none !important;
+}
+:deep(.vditor-toolbar__divider) {
+  border-left: 1px solid var(--border) !important;
+}
+:deep(.vditor-ir pre.vditor-reset),
+:deep(.vditor-sv) {
+  background-color: transparent !important;
+}
+:deep(.vditor-reset) {
+  color: var(--text-primary) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.8 !important;
+  padding-bottom: 80px !important; /* Prevent truncation at bottom */
+}
+:deep(.vditor-reset p) {
+  margin-bottom: 1em !important;
+}
+:deep(.vditor-outline) {
+  border: none !important;
+  background-color: var(--surface) !important;
+}
+:deep(.vditor--fullscreen) {
+  z-index: 10000 !important; /* Fallback: if triggered via shortcut, ensure it covers the app header so exit is clickable */
+}
+
+/* Action Select Dropdown */
+.action-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.select-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.action-select {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 28px 5px 26px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+}
+.action-select:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+.action-select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--text-secondary);
+  pointer-events: none;
+}
+
 </style>
