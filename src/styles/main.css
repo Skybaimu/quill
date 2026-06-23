@@ -156,7 +156,7 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background-color: #282c34; /* Match atom-one-dark background */
+  background-color: var(--surface); /* Match light theme background */
 }
 
 .code-editor-container {
@@ -202,7 +202,7 @@ body {
   outline: none;
   background: transparent;
   color: transparent; /* Hide actual text, show only caret */
-  caret-color: #fff;  /* Make cursor visible on dark background */
+  caret-color: var(--text-primary);  /* Make cursor visible on light background */
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 14px;
   line-height: 1.5;
@@ -212,6 +212,6 @@ body {
 }
 
 .code-textarea::selection {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.1);
   color: transparent;
 }
