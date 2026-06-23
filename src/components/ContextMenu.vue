@@ -52,6 +52,15 @@
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           删除
         </div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" @click="doAction('sort-name')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0L19 4m2 4h-2m-9 8h13m-13 4h9m9-4l-4 4m0 0l-4-4m4 4v-2"/></svg>
+          按名称排序
+        </div>
+        <div class="ctx-item" @click="doAction('sort-time')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          按时间排序
+        </div>
         <template v-if="targetCat?.sourcePath">
           <div class="ctx-divider"></div>
           <div class="ctx-item" @click="doAction('refresh-overwrite')">
@@ -159,6 +168,12 @@ function doAction(act) {
       case 'refresh-overwrite':
       case 'refresh-add': {
         const event = new CustomEvent('quill-refresh-folder', { detail: { id: cat.id, mode: act } })
+        window.dispatchEvent(event)
+        break
+      }
+      case 'sort-name':
+      case 'sort-time': {
+        const event = new CustomEvent('quill-sort-category', { detail: { id: cat.id, sortBy: act } })
         window.dispatchEvent(event)
         break
       }

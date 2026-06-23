@@ -113,43 +113,41 @@ function collectFromDirectoryEntry(dirEntry, path, maxDepth, collected) {
 }
 
 onMounted(async () => {
-  // Check CLI arguments for files opened externally
-  try {
-    const matches = await getMatches()
-    if (matches.args && matches.args.file && matches.args.file.value) {
-      await openFileFromPath(matches.args.file.value)
-    }
-  } catch (err) {
-    console.error('Failed to parse CLI arguments:', err)
-  }
-
-  // Listen for single instance event (when user double-clicks another .md file while app is running)
-  listen('single-instance', async (event) => {
-    const args = event.payload
-    if (args && args.length > 1) {
-      const filePath = args[args.length - 1]
-      if (filePath && !filePath.startsWith('--') && (filePath.includes('\\') || filePath.includes('/'))) {
-        await openFileFromPath(filePath)
-      }
-    }
-  })
-
-  // Listen for Tauri's native drop event to capture absolute paths
+  const isTauri = !!window.__TAURI_INTERNALS__
   let lastTauriDroppedPaths = []
-  listen('tauri://drag-drop', (event) => {
-    if (event.payload?.paths) {
-      lastTauriDroppedPaths = event.payload.paths
-    } else if (Array.isArray(event.payload)) {
-      lastTauriDroppedPaths = event.payload
+
+  if (isTauri) {
+    // Check CLI arguments for files opened externally
+    try {
+      const matches = await getMatches()
+      if (matches.args && matches.args.file && matches.args.file.value) {
+        await openFileFromPath(matches.args.file.value)
+      }
+    } catch (err) {
+      console.error('Failed to parse CLI arguments:', err)
     }
-  })
-  listen('tauri://file-drop', (event) => {
-    if (event.payload?.paths) {
-      lastTauriDroppedPaths = event.payload.paths
-    } else if (Array.isArray(event.payload)) {
-      lastTauriDroppedPaths = event.payload
-    }
-  })
+
+    // Listen for single instance event (when user double-clicks another .md file while app is running)
+    listen('single-instance', async (event) => {
+      const args = event.payload
+      if (args && args.length > 1) {
+        const filePath = args[args.length - 1]
+        if (filePath && !filePath.startsWith('--') && (filePath.includes('\\') || filePath.includes('/'))) {
+          await openFileFromPath(filePath)
+        }
+      }
+    })
+
+    // Listen for Tauri's native drop event to capture absolute paths
+    import('@tauri-apps/api/webviewWindow').then(module => {
+      const appWindow = module.getCurrentWebviewWindow()
+      appWindow.onDragDropEvent((event) => {
+        if (event.payload.type === 'enter' || event.payload.type === 'drop') {
+          lastTauriDroppedPaths = event.payload.paths || []
+        }
+      })
+    }).catch(err => console.error('Failed to init drag-drop event:', err))
+  }
 
   // HTML5 drop handler for external files/folders (works in both browser and Tauri)
   // Internal drag-drop (category/file reordering) is handled by Sidebar.vue / FilePanel.vue
@@ -255,10 +253,31 @@ onMounted(async () => {
       }
       
       await collectTauriDir(cat.sourcePath, '', 1)
-      showToast(`文件夹刷新完毕，新增 ${importedCount} 个文件`)
+      if (importedCount > 0) showToast(`已刷新，新增 ${importedCount} 个文件`)
+      else showToast('刷新完成，没有新文件')
     } catch (err) {
       console.error('Refresh folder failed:', err)
-      showToast('刷新文件夹失败: ' + err.message)
+      showToast('刷新失败')
+    }
+  })
+
+  // Listen for sort category requests
+  window.addEventListener('quill-sort-category', (e) => {
+    const { id, sortBy } = e.detail
+    if (!store.files[id] || store.files[id].length <= 1) return
+
+    if (sortBy === 'sort-name') {
+      // Natural sort by name (1, 2, 10, 11)
+      store.files[id].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+      showToast('已按名称排序')
+    } else if (sortBy === 'sort-time') {
+      // Sort by updatedAt descending (newest first)
+      store.files[id].sort((a, b) => {
+        const timeA = a.updatedAt || a.createdAt || 0
+        const timeB = b.updatedAt || b.createdAt || 0
+        return timeB - timeA
+      })
+      showToast('已按时间排序')
     }
   })
 
