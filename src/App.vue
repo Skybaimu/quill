@@ -134,6 +134,23 @@ onMounted(async () => {
     }
   })
 
+  // Listen for Tauri's native drop event to capture absolute paths
+  let lastTauriDroppedPaths = []
+  listen('tauri://drag-drop', (event) => {
+    if (event.payload?.paths) {
+      lastTauriDroppedPaths = event.payload.paths
+    } else if (Array.isArray(event.payload)) {
+      lastTauriDroppedPaths = event.payload
+    }
+  })
+  listen('tauri://file-drop', (event) => {
+    if (event.payload?.paths) {
+      lastTauriDroppedPaths = event.payload.paths
+    } else if (Array.isArray(event.payload)) {
+      lastTauriDroppedPaths = event.payload
+    }
+  })
+
   // HTML5 drop handler for external files/folders (works in both browser and Tauri)
   // Internal drag-drop (category/file reordering) is handled by Sidebar.vue / FilePanel.vue
   // via @drop.prevent.stop which stops propagation, so this handler only fires for external drops.
@@ -157,7 +174,13 @@ onMounted(async () => {
         
         // Track original path if available (Tauri drag-drop sets .path on the File objects)
         let folderPath = ''
-        if (e.dataTransfer?.files) {
+        if (lastTauriDroppedPaths && lastTauriDroppedPaths.length > 0) {
+          const matchedPath = lastTauriDroppedPaths.find(p => 
+            p.endsWith(entry.name) || p.endsWith(entry.name + '/') || p.endsWith(entry.name + '\\')
+          )
+          if (matchedPath) folderPath = matchedPath
+        }
+        if (!folderPath && e.dataTransfer?.files) {
           for (let i = 0; i < e.dataTransfer.files.length; i++) {
             const f = e.dataTransfer.files[i]
             if (f.name === entry.name && f.path) {
