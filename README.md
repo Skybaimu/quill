@@ -327,8 +327,14 @@ quill/
 
 Buy me a coffee ~
 软件本身不收费。若愿意请作者喝杯咖啡，可扫下方收款码（完全自愿，不影响任何功能）：
-<img width="613" height="821" alt="收款码" src="https://github.com/user-attachments/assets/722a30ff-0803-4fa8-913e-72e59983a217" />
 
+<!-- 核心图片代码 -->
+<img 
+  width="25%" 
+  alt="收款码" 
+  src="https://github.com/user-attachments/assets/722a30ff-0803-4fa8-913e-72e59983a217"
+  style="display:block; margin:30px auto; height:auto;"
+/>
 
 ## 📦 版本历史
 
