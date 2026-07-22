@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quill — 轻量笔记</title>
-  <script>const _log = console.log; const _err = console.error; window.onerror = function(e){ fetch('http://localhost:9999/log', {method:'POST', body: e.toString()}) }; console.log = function(...args){ fetch('http://localhost:9999/log', {method:'POST', body: args.join(' ')}); _log(...args); }; console.error = function(...args){ fetch('http://localhost:9999/err', {method:'POST', body: args.join(' ')}); _err(...args); };</script></head>
+  </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
