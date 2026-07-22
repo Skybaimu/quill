@@ -320,6 +320,15 @@ quill/
 | 阴影 | sm: 0 1px 3px / md: 0 4px 12px / lg: 0 8px 32px / xl: 0 16px 48px |
 
 ---
+# 免责声明
+本项目免费，仅供学习与个人创作整理使用。请遵守相关法律法规，合理使用
+
+如果这个项目对你有帮助，欢迎点一颗 ⭐，或转给同样需要管理提示词的朋友。
+
+Buy me a coffee ~
+软件本身不收费。若愿意请作者喝杯咖啡，可扫下方收款码（完全自愿，不影响任何功能）：
+<img width="613" height="821" alt="收款码" src="https://github.com/user-attachments/assets/722a30ff-0803-4fa8-913e-72e59983a217" />
+
 
 ## 📦 版本历史
 
